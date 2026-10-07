@@ -1,0 +1,8 @@
+# Your graph is private: never commit it.
+memory.jsonl
+*.jsonl
+archive/
+backups/
+node_modules/
+.DS_Store
+__pycache__/
