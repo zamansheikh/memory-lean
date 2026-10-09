@@ -17,7 +17,7 @@ There is nothing to install. You need Node 18 or newer.
 
 | Path | What it is |
 |---|---|
-| `server/memory-lean.mjs` | The whole server: storage, the nine tools, MCP over stdio, and the `--lint` / `--compact` commands |
+| `server/memory-lean.mjs` | The whole server: storage, the tools, MCP over stdio, and the command-line flags |
 | `test/memory-lean.test.mjs` | Tests that start the server and talk to it over stdio, as a client would |
 | `tools/bench.mjs` | Compares answer sizes with the reference server on a graph |
 | `docs/AGENT-PROTOCOL.md` | The agent instructions; `--protocol` and `--skill` print this file |
