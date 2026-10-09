@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Releases are now published by a GitHub workflow (npm trusted publishing, then the MCP registry). No change to the server.
+
 ## 1.4.0
 
 ### Added
