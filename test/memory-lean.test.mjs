@@ -218,3 +218,21 @@ test("--lint reports without writing, --compact archives the overflow", () => {
   assert.deepEqual(s.rows()[0].observations, ["identity", "2026-01-03: c"]);
   assert.match(fs.readFileSync(path.join(s.dir, "archive", "api.md"), "utf8"), /compacted .*\n- 2026-01-01: a\n- 2026-01-02: b/);
 });
+
+test("--protocol prints the agent instructions and --skill writes the same text as the plugin's skill", () => {
+  const s = session();
+  const protocol = s.cli("--protocol");
+  assert.match(protocol, /^# Memory graph protocol\n\nA knowledge graph/);
+  assert.doesNotMatch(protocol, /Paste this into/);
+  assert.match(s.cli("--skill", path.join(s.dir, "skills")), /Wrote .*memory-graph/);
+  const skill = fs.readFileSync(path.join(s.dir, "skills", "memory-graph", "SKILL.md"), "utf8");
+  assert.match(skill, /^---\nname: memory-graph\ndescription: .+\n---\n\n# Memory graph protocol/);
+  assert.equal(skill.endsWith(protocol), true);
+  // the copy shipped in the Claude Code plugin must not drift from the protocol
+  assert.equal(fs.readFileSync(path.join(ROOT, "plugin", "skills", "memory-graph", "SKILL.md"), "utf8"), skill);
+});
+
+test("the plugin and the package agree on the version", () => {
+  const version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, "plugin", ".claude-plugin", "plugin.json"), "utf8")).version, version);
+});

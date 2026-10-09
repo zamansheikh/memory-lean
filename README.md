@@ -45,34 +45,51 @@ One file. No dependencies. Nothing to build.
 
 ## Quick start
 
-**Claude Code**
+**Claude Code**: install the plugin. It adds the server, a skill with the agent
+instructions, and a short reminder at the start of each session.
 
-```bash
-claude mcp add --scope user memory -- npx -y memory-lean
+```text
+/plugin marketplace add zamansheikh/memory-lean
+/plugin install memory-lean@memory-lean
 ```
 
-**Claude Desktop, Cursor, Windsurf and other MCP clients**: add this to the
-client's MCP config (`claude_desktop_config.json`, `.cursor/mcp.json`, …):
+**Any other agent**: add the server to the agent's MCP config, then give the agent
+the instructions.
 
 ```json
 {
   "mcpServers": {
-    "memory": {
-      "command": "npx",
-      "args": ["-y", "memory-lean"]
-    }
+    "memory": { "command": "npx", "args": ["-y", "memory-lean"] }
   }
 }
 ```
 
-The graph is created on the first write at `~/.claude/memory-graph/memory.jsonl`.
-Set `MEMORY_FILE_PATH` to keep it somewhere else.
+```bash
+npx -y memory-lean --protocol >> AGENTS.md   # into the rules file your agent reads
+```
 
-Then [teach your agent to use it](#teach-your-agent-to-use-it). That step matters
-as much as the install.
+The config file and its exact shape differ per agent.
+
+Copy-paste setup for each agent is in **[docs/SETUP.md](docs/SETUP.md)**:
+
+| Agent | Server config | Instructions |
+|---|---|---|
+| [Claude Code](docs/SETUP.md#claude-code) | plugin | included in the plugin |
+| [Xiaomi MiMo Code](docs/SETUP.md#xiaomi-mimo-code) | `mimocode.jsonc` | skill or `AGENTS.md` |
+| [opencode](docs/SETUP.md#opencode) | `opencode.json` | `AGENTS.md` |
+| [OpenAI Codex CLI](docs/SETUP.md#openai-codex-cli) | `codex mcp add` | `AGENTS.md` |
+| [Cursor](docs/SETUP.md#cursor) | `.cursor/mcp.json` | `AGENTS.md` or a rule |
+| [VS Code (Copilot)](docs/SETUP.md#vs-code-github-copilot) | `.vscode/mcp.json` | `copilot-instructions.md` |
+| [Gemini CLI](docs/SETUP.md#gemini-cli) | `settings.json` | `GEMINI.md` |
+| [Windsurf](docs/SETUP.md#windsurf) | `mcp_config.json` | a rule |
+| [Claude Desktop](docs/SETUP.md#claude-desktop) | `claude_desktop_config.json` | project instructions |
+
+The graph is created on the first write at `~/.claude/memory-graph/memory.jsonl`,
+whichever agent writes to it, so several agents can share one memory. Set
+`MEMORY_FILE_PATH` to keep it somewhere else.
 
 <details>
-<summary>Install from a clone instead</summary>
+<summary>Run from a clone instead of npm</summary>
 
 ```bash
 git clone https://github.com/zamansheikh/memory-lean.git
@@ -172,8 +189,15 @@ without asking.
 A memory server only helps if the agent reads it before working and writes to it
 when something changes. [`docs/AGENT-PROTOCOL.md`](docs/AGENT-PROTOCOL.md) is a
 ready-made set of instructions: what to look up at the start of a task, what to
-record, how to name things, and what never to store. Paste it into your
-`CLAUDE.md`, `AGENTS.md` or system prompt and adjust the entity types to your work.
+record, how to name things, and what never to store. The Claude Code plugin
+includes it. For every other agent, one command installs it:
+
+```bash
+npx -y memory-lean --protocol >> AGENTS.md     # into a rules file: always on
+npx -y memory-lean --skill .agents/skills      # as an Agent Skill: loaded when relevant
+```
+
+Adjust the entity types and names in it to your own work.
 
 ## Coming from the reference memory server
 
@@ -211,8 +235,9 @@ All optional, set as environment variables on the server:
 
 ## Roadmap
 
-- [ ] A Claude Code plugin that installs the server and the agent protocol together
-- [ ] Ready-made protocol files for Cursor, Codex and other agents
+- [x] A Claude Code plugin that installs the server and the agent protocol together
+- [x] Ready-made setup for MiMo Code, Codex, Cursor and other agents
+- [ ] Setup guides for more agents (Cline, Zed, JetBrains, …)
 - [ ] Windows in the CI matrix
 - [ ] `rename_entity`, keeping relations intact
 

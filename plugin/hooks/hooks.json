@@ -1,0 +1,15 @@
+{
+  "description": "Reminds the agent at session start that the memory graph exists",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

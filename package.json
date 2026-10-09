@@ -1,6 +1,6 @@
 {
   "name": "memory-lean",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "A token-lean MCP memory server: a knowledge graph your AI agent can search without reading the whole thing. Drop-in replacement for @modelcontextprotocol/server-memory.",
   "type": "module",
   "bin": { "memory-lean": "server/memory-lean.mjs" },

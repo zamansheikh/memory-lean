@@ -12,6 +12,8 @@
 // Run with no arguments to serve MCP over stdio, or:
 //   --lint      report what is over budget (read-only)
 //   --compact   back up, then move overflow observations to archive/
+//   --protocol  print the agent instructions (append them to AGENTS.md, CLAUDE.md, ...)
+//   --skill DIR write the same instructions as an Agent Skill into DIR/memory-graph
 //   --version
 //
 // Environment (all optional):
@@ -25,7 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const VERSION = "1.1.1"; // kept equal to package.json by a test
+const VERSION = "1.2.0"; // kept equal to package.json by a test
 
 const num = (name, fallback) => {
   const v = Number(process.env[name]);
@@ -469,12 +471,43 @@ function lint(apply) {
   } finally { unlock(); }
 }
 
+// The instructions an agent needs to use the graph well: --protocol prints them, ready to
+// append to a rules file; --skill <dir> writes them as an Agent Skill in <dir>/memory-graph.
+const SKILL_HEADER = `---
+name: memory-graph
+description: Read and maintain the memory-lean knowledge graph (the \`memory\` MCP server). Use at the start of any task, before reading code, to look up the projects, packages and services the task touches, and whenever work changes state - a version bump, publish, deploy, migration or config change, a new project or service, or a rule learned from a failure.
+---
+
+`;
+
+function protocolText() {
+  try {
+    return fs.readFileSync(new URL("../docs/AGENT-PROTOCOL.md", import.meta.url), "utf8")
+      .replace(/\n\*Instructions for an AI coding agent[\s\S]*?\*\n/, "");
+  } catch {
+    process.exitCode = 1;
+    console.error("docs/AGENT-PROTOCOL.md is not next to this server; get it from https://github.com/zamansheikh/memory-lean");
+  }
+}
+
+function writeSkill(dir) {
+  const text = protocolText();
+  if (!text) return;
+  if (!dir) { process.exitCode = 2; return console.error("Usage: memory-lean --skill <skills directory>, e.g. .claude/skills or .agents/skills"); }
+  const file = path.join(dir, "memory-graph", "SKILL.md");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, SKILL_HEADER + text);
+  console.log(`Wrote ${file}`);
+}
+
 const arg = process.argv[2];
 if (!arg) serve();
 else if (arg === "--lint") lint(false);
 else if (arg === "--compact") lint(true);
+else if (arg === "--protocol") process.stdout.write(protocolText() || "");
+else if (arg === "--skill") writeSkill(process.argv[3]);
 else if (arg === "--version" || arg === "-v") console.log(VERSION);
 else {
-  console.log("memory-lean [--lint | --compact | --version]\nWith no arguments, serves MCP over stdio. See README.md.");
+  console.log("memory-lean [--lint | --compact | --protocol | --skill <dir> | --version]\nWith no arguments, serves MCP over stdio. See README.md.");
   process.exitCode = arg === "--help" || arg === "-h" ? 0 : 2;
 }

@@ -20,7 +20,9 @@ There is nothing to install. You need Node 18 or newer.
 | `server/memory-lean.mjs` | The whole server: storage, the nine tools, MCP over stdio, and the `--lint` / `--compact` commands |
 | `test/memory-lean.test.mjs` | Tests that start the server and talk to it over stdio, as a client would |
 | `tools/bench.mjs` | Compares answer sizes with the reference server on a graph |
-| `docs/AGENT-PROTOCOL.md` | Instructions users paste into their agent's prompt |
+| `docs/AGENT-PROTOCOL.md` | The agent instructions; `--protocol` and `--skill` print this file |
+| `docs/SETUP.md` | Copy-paste setup for each agent |
+| `plugin/` | The Claude Code plugin; `.claude-plugin/marketplace.json` at the root lists it |
 
 To try a change against a throwaway graph:
 
@@ -38,6 +40,9 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read_graph
   Users must be able to switch in and switch back.
 - **Small answers.** Before adding output to a tool, ask what it costs in tokens on
   a graph of a few hundred entities. `node tools/bench.mjs` shows the numbers.
+- **One copy of the protocol.** Edit `docs/AGENT-PROTOCOL.md`, then run
+  `node server/memory-lean.mjs --skill plugin/skills` to refresh the plugin's
+  skill. A test fails if they differ.
 - **Docs that match.** If behaviour or a setting changes, update `README.md`,
   `docs/AGENT-PROTOCOL.md` and `CHANGELOG.md` in the same pull request.
 
@@ -48,7 +53,7 @@ problem instead.
 ## Good first contributions
 
 - Run the tests on Windows and report or fix what fails.
-- A protocol file for an agent you use (Cursor rules, `AGENTS.md`, …).
+- A section in `docs/SETUP.md` for an agent you use, tested on a real install.
 - Anything on the roadmap in the README.
 
 ## Reporting a bug

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+
+- A Claude Code plugin (`/plugin marketplace add zamansheikh/memory-lean`): the
+  server, the protocol as a `memory-graph` skill, and a short session-start reminder.
+- `--protocol` prints the agent instructions, ready to append to `AGENTS.md`,
+  `CLAUDE.md`, `GEMINI.md` or any other rules file.
+- `--skill <dir>` writes the same instructions as an Agent Skill.
+- `docs/SETUP.md`: copy-paste setup for Claude Code, Xiaomi MiMo Code, opencode,
+  Codex CLI, Cursor, VS Code, Gemini CLI, Windsurf and Claude Desktop.
+
 ## 1.1.1
 
 - Project icon, reorganised README, author and funding details in the package. No change to the server.

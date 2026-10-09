@@ -1,0 +1,17 @@
+{
+  "name": "memory-lean",
+  "owner": {
+    "name": "Zaman Sheikh",
+    "url": "https://zamansheikh.com"
+  },
+  "metadata": {
+    "description": "memory-lean: long-term memory for AI coding agents that doesn't burn the context window."
+  },
+  "plugins": [
+    {
+      "name": "memory-lean",
+      "source": "./plugin",
+      "description": "Long-term memory for Claude Code that doesn't burn the context window: the memory-lean MCP server plus the skill that teaches the agent to use it."
+    }
+  ]
+}
