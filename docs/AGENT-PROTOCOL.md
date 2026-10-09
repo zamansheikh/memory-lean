@@ -27,7 +27,8 @@ not as truth.
 **Keep the graph small.** It is a fact index, not a work log.
 
 - One fact per observation. Over 300 characters is rejected by the server.
-- Above 15 observations the server moves the oldest to `archive/`, so delete stale
+- Above 15 observations the server moves the oldest dated ones to `archive/`
+  (undated facts always stay), so delete stale
   or superseded facts yourself first (an old version number, a "left uncommitted"
   that is now committed) to choose what is kept.
 - Update by replacing: delete the old fact, add the new one. Do not append
