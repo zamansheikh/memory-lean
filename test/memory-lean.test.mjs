@@ -33,10 +33,15 @@ test("speaks MCP: initialize and tools/list", () => {
   const s = session();
   const [init, list] = s.rpc([{ method: "initialize", params: {} }, { method: "tools/list" }]);
   assert.equal(init.result.serverInfo.name, "memory-lean");
-  assert.equal(init.result.serverInfo.version, JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version);
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  assert.equal(init.result.serverInfo.version, pkg.version);
+  // the MCP registry entry describes the same release
+  const registry = JSON.parse(fs.readFileSync(path.join(ROOT, "server.json"), "utf8"));
+  assert.deepEqual([registry.name, registry.version, registry.packages[0].version], [pkg.mcpName, pkg.version, pkg.version]);
+  assert.ok(registry.description.length <= 100);
   assert.deepEqual(
     list.result.tools.map((t) => t.name).sort(),
-    ["add_observations", "create_entities", "create_relations", "delete_entities", "delete_observations", "delete_relations", "open_nodes", "read_graph", "rename_entity", "search_nodes"],
+    ["add_observations", "archived_observations", "create_entities", "create_relations", "delete_entities", "delete_observations", "delete_relations", "open_nodes", "read_graph", "rename_entity", "search_nodes"],
   );
   // only the three read tools are marked read-only
   assert.deepEqual(
@@ -246,7 +251,7 @@ test("rename_entity keeps observations, relations and the archive", () => {
   s.call("create_relations", { relations: [{ from: "app", to: "old api", relationType: "talks_to" }, { from: "old api", to: "old api", relationType: "replaces" }] });
   assert.match(s.call("rename_entity", { name: "old api", newName: "api" }).text, /Renamed old api -> api; 3 relation end\(s\) updated/);
   const opened = s.call("open_nodes", { names: ["api"] }).text;
-  assert.match(opened, /## api \[service\]\n- 2026-01-02: b/);
+  assert.match(opened, /## api \[service\] \(1 archived\)\n- 2026-01-02: b/);
   assert.match(opened, /app -talks_to-> api\napi -replaces-> api/);
   assert.match(s.call("open_nodes", { names: ["old api"] }).text, /Not found: "old api"/);
   assert.deepEqual(fs.readdirSync(path.join(s.dir, "archive")), ["api.md"]);
@@ -255,4 +260,28 @@ test("rename_entity keeps observations, relations and the archive", () => {
   assert.match(s.call("rename_entity", { name: "api", newName: "app" }).text, /already exists/);
   assert.match(s.call("rename_entity", { name: "nope", newName: "x" }).text, /Entity not found: nope/);
   assert.equal(s.rows().filter((r) => r.type === "entity").length, 2);
+});
+
+test("archived observations can be listed, searched and restored", () => {
+  const s = session({ MEMORY_OBS_MAX: "2" });
+  s.call("create_entities", { entities: [{ name: "api", entityType: "service", observations: [
+    "2026-01-01: deployed 1.0", "2026-01-02: moved to Postgres", "2026-01-03: deployed 1.1", "2026-01-04: deployed 1.2",
+  ] }] });
+  assert.match(s.call("open_nodes", { names: ["api"] }).text, /## api \[service\] \(2 archived\)/);
+  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "2 archived for api:\n- 2026-01-01: deployed 1.0\n- 2026-01-02: moved to Postgres");
+  assert.equal(s.call("archived_observations", { entityName: "api", query: "postgres moved" }).text, "1 archived for api:\n- 2026-01-02: moved to Postgres");
+  assert.match(s.call("archived_observations", { entityName: "api", query: "mysql" }).text, /None of the 2 archived/);
+  assert.match(s.call("archived_observations", { entityName: "other" }).text, /Nothing archived for "other"/);
+
+  const res = s.call("archived_observations", { entityName: "api", restore: ["2026-01-02: moved to Postgres", "typo"] });
+  assert.match(res.text, /api: restored 1, now 3 \(1 not matched exactly\) \(over cap 2/);
+  assert.deepEqual(s.rows()[0].observations, ["2026-01-03: deployed 1.1", "2026-01-04: deployed 1.2", "2026-01-02: moved to Postgres"]);
+  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "1 archived for api:\n- 2026-01-01: deployed 1.0");
+
+  // nothing matched: the graph and the archive are left alone
+  const miss = s.call("archived_observations", { entityName: "api", restore: ["nope"] });
+  assert.equal(miss.isError, true);
+  // restoring the last one removes the archive file
+  s.call("archived_observations", { entityName: "api", restore: ["2026-01-01: deployed 1.0"] });
+  assert.deepEqual(fs.readdirSync(path.join(s.dir, "archive")), []);
 });

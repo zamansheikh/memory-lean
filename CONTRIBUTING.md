@@ -22,6 +22,7 @@ There is nothing to install. You need Node 18 or newer.
 | `tools/bench.mjs` | Compares answer sizes with the reference server on a graph |
 | `docs/AGENT-PROTOCOL.md` | The agent instructions; `--protocol` and `--skill` print this file |
 | `docs/SETUP.md` | Copy-paste setup for each agent |
+| `server.json` | The entry for the official MCP registry; its version must match `package.json` |
 | `plugin/` | The Claude Code plugin; `.claude-plugin/marketplace.json` at the root lists it |
 
 To try a change against a throwaway graph:

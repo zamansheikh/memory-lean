@@ -33,6 +33,8 @@ not as truth.
   (undated facts always stay), so delete stale
   or superseded facts yourself first (an old version number, a "left uncommitted"
   that is now committed) to choose what is kept.
+- Archived facts are not lost: `archived_observations` lists them for an entity
+  and can restore one. Look there when the history of a project matters.
 - Update by replacing: delete the old fact, add the new one. Do not append
   "correction to the earlier observation".
 - Session narratives, test transcripts, gap lists and roadmaps go in the repo

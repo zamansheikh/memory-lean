@@ -33,8 +33,8 @@ memory-lean is an [MCP](https://modelcontextprotocol.io) server that gives Claud
 Code, Claude Desktop, Cursor and any other MCP client a knowledge graph that
 persists between sessions. It is a drop-in replacement for the reference memory
 server ([`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory)):
-same `memory.jsonl` file, same nine tool names (plus one extra, `rename_entity`).
-What changes is how much the tools send back.
+same `memory.jsonl` file, same nine tool names, plus two extras. What changes is
+how much the tools send back.
 
 | Call, on a real graph of 237 entities | Reference server | memory-lean | |
 |---|---:|---:|---:|
@@ -145,7 +145,7 @@ what it returns and what it stores.
 |---|---|
 | **Small answers** | `search_nodes` returns at most 10 names with snippets, `read_graph` returns an index of names, and only `open_nodes` returns full entities. |
 | **Short facts** | An observation longer than 300 characters is rejected, with a message telling the agent to split it or put the detail in the repo. |
-| **A cap per entity** | An entity keeps 15 observations. Past that, the oldest dated ones move to `archive/<entity>.md` next to the graph. Nothing is deleted, and undated observations (the identity facts) always stay. |
+| **A cap per entity** | An entity keeps 15 observations. Past that, the oldest dated ones move to `archive/<entity>.md` next to the graph. Nothing is deleted: the agent can list and restore them, and undated observations (the identity facts) always stay. |
 | **Multi-word search that works** | Every word must match somewhere in the entity, so adding a word narrows the result. The reference server looks for the query as one exact phrase. |
 
 And it is careful with the file:
@@ -181,6 +181,7 @@ because there was little to trim.
 | `create_relations` | Creates relations between existing entities; duplicates are skipped. |
 | `add_observations` | Adds facts to an entity, enforcing the length limit and the per-entity cap. |
 | `rename_entity` | Renames an entity, keeping its observations, relations and archive. Not in the reference server. |
+| `archived_observations` | Lists what was archived for an entity, optionally filtered, and can restore chosen observations. Not in the reference server. |
 | `delete_observations` | Removes observations by exact text. |
 | `delete_relations` | Removes specific relations. |
 | `delete_entities` | Removes entities and every relation touching them. |
@@ -244,8 +245,9 @@ All optional, set as environment variables on the server:
 - [x] Setup guides for Cline, Zed and JetBrains IDEs
 - [x] Windows in the CI matrix
 - [x] `rename_entity`, keeping relations intact
-- [ ] A way to list and restore archived observations
-- [ ] Listings in the MCP and Claude Code plugin directories
+- [x] A way to list and restore archived observations
+- [ ] Listings in the MCP registry and the Claude Code plugin directory
+- [ ] Search across archived observations of every entity
 
 ## Contributing
 

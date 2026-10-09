@@ -1,0 +1,25 @@
+name: publish to MCP registry
+
+# Run by hand after `npm publish`: the registry checks that the npm package of the
+# same version exists and carries the matching mcpName.
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that this version is on npm
+        run: |
+          version=$(node -p "require('./package.json').version")
+          npm view "memory-lean@$version" version || { echo "memory-lean@$version is not on npm yet; run npm publish first"; exit 1; }
+      - name: Install mcp-publisher
+        run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+      - name: Log in with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+      - name: Publish
+        run: ./mcp-publisher publish

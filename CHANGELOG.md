@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+
+- `archived_observations`: lists what was archived for an entity, optionally
+  filtered by a query, and restores chosen observations to the entity.
+- `open_nodes` shows how many observations an entity has in the archive.
+- `server.json` and `mcpName`, the metadata for the official MCP registry, with a
+  workflow that publishes it.
+
 ## 1.3.0
 
 ### Added

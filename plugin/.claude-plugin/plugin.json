@@ -1,7 +1,7 @@
 {
   "name": "memory-lean",
   "description": "Long-term memory for Claude Code that doesn't burn the context window: a knowledge graph the agent searches cheaply, plus the instructions for keeping it useful.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": { "name": "Zaman Sheikh", "url": "https://zamansheikh.com" },
   "homepage": "https://github.com/zamansheikh/memory-lean",
   "repository": "https://github.com/zamansheikh/memory-lean",

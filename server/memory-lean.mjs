@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Drop-in replacement for @modelcontextprotocol/server-memory, same memory.jsonl format
-// and tool names (plus rename_entity), tuned to keep tool results small:
+// and tool names (plus rename_entity and archived_observations), tuned to keep tool results small:
 //   search_nodes  ranked, capped list of names + matching snippets (not full entities)
 //   open_nodes    full entities as compact text, with their relations
 //   read_graph    name index grouped by type (not the whole graph)
@@ -27,7 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const VERSION = "1.3.0"; // kept equal to package.json by a test
+const VERSION = "1.4.0"; // kept equal to package.json by a test
 
 const num = (name, fallback) => {
   const v = Number(process.env[name]);
@@ -121,12 +121,14 @@ function lock() {
 }
 
 // Load, change and save under the lock. Readers need no lock: the file is replaced atomically.
-function mutate(fn) {
+// 'after' runs once the graph is safely written, for changes to other files.
+function mutate(fn, after) {
   const unlock = lock();
   try {
     const g = load();
     const out = fn(g);
     save(g);
+    after?.();
     return g.unreadable.length
       ? `${out}\nWarning: ${g.unreadable.length} unreadable line(s) in the graph file were moved to ${path.basename(UNREADABLE)}.`
       : out;
@@ -141,6 +143,28 @@ function archive(name, observations, why) {
   const stamp = new Date().toISOString().slice(0, 19).replace("T", " ");
   fs.appendFileSync(file, `\n## ${why} ${stamp} from \`${name}\`\n` + observations.map(o => `- ${o}\n`).join(""));
 }
+
+// An archive file as sections of { header, items }, one item per archived observation.
+function readArchive(name) {
+  let text;
+  try { text = fs.readFileSync(archiveFile(name), "utf8"); } catch { return []; }
+  const sections = [];
+  for (const line of text.split("\n")) {
+    const last = sections[sections.length - 1];
+    if (line.startsWith("## ")) sections.push({ header: line, items: [] });
+    else if (line.startsWith("- ")) (last || sections[sections.push({ header: "## archived", items: [] }) - 1]).items.push(line.slice(2));
+    else if (line.trim() && last?.items.length) last.items[last.items.length - 1] += "\n" + line;
+  }
+  return sections;
+}
+
+function writeArchive(name, sections) {
+  const kept = sections.filter(s => s.items.length);
+  if (!kept.length) return fs.rmSync(archiveFile(name), { force: true });
+  fs.writeFileSync(archiveFile(name), kept.map(s => `\n${s.header}\n` + s.items.map(o => `- ${o}\n`).join("")).join(""));
+}
+
+const archivedOf = name => [...new Set(readArchive(name).flatMap(s => s.items))];
 
 // Indexes of the observations to archive: the oldest dated ones. Undated observations
 // (the identity facts) always stay, even if they alone exceed the cap.
@@ -175,7 +199,8 @@ const rejectObservations = bad => {
 const relLine = r => `${r.from} -${r.relationType}-> ${r.to}`;
 
 function formatEntity(e) {
-  return `## ${e.name} [${e.entityType}]\n` + e.observations.map(o => `- ${o}`).join("\n");
+  const archived = archivedOf(e.name).length;
+  return `## ${e.name} [${e.entityType}]${archived ? ` (${archived} archived)` : ""}\n` + e.observations.map(o => `- ${o}`).join("\n");
 }
 
 function snippet(text, terms) {
@@ -347,6 +372,42 @@ const tools = {
         }
         return out.join("\n");
       });
+    },
+  },
+
+  archived_observations: {
+    description: "List the observations of an entity that were moved to archive/, oldest first. Pass 'restore' with exact texts to move them back onto the entity.",
+    inputSchema: { type: "object", properties: {
+      entityName: { type: "string" },
+      query: { type: "string", description: "Only archived observations containing every term" },
+      restore: { type: "array", items: { type: "string" }, description: "Exact texts to move back onto the entity" },
+    }, required: ["entityName"] },
+    run({ entityName, query, restore }) {
+      if (!str(entityName)) throw new Error("Rejected, entityName must be a non-empty string.");
+      if (restore === undefined) {
+        const terms = String(query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+        const all = archivedOf(entityName);
+        const items = all.filter(o => terms.every(t => o.toLowerCase().includes(t)));
+        if (!items.length) return all.length ? `None of the ${all.length} archived observation(s) of "${entityName}" match "${query}".` : `Nothing archived for "${entityName}".`;
+        // Over budget, the oldest are left out: the newest are the likeliest to be wanted back.
+        let shown = items.length, size = 0;
+        while (shown > 0 && size + items[shown - 1].length + 3 <= SEARCH_MAX_CHARS) size += items[--shown].length + 3;
+        return `${items.length} archived for ${entityName}` + (shown ? `, ${shown} oldest not shown (add a query)` : "") + ":\n" + items.slice(shown).map(o => `- ${o}`).join("\n");
+      }
+      const want = new Set(list(restore, "restore"));
+      let sections;
+      return mutate(g => {
+        const e = g.entities.find(e => e.name === entityName);
+        if (!e) throw new Error(`Entity not found: ${entityName}`);
+        sections = readArchive(entityName);
+        const found = new Set();
+        for (const s of sections) s.items = s.items.filter(o => !want.has(o) || !found.add(o));
+        if (!found.size) throw new Error(`None of those are in the archive of "${entityName}" (the text must match exactly).`);
+        e.observations.push(...[...found].filter(o => !e.observations.includes(o)));
+        return `${e.name}: restored ${found.size}, now ${e.observations.length}`
+          + (want.size > found.size ? ` (${want.size - found.size} not matched exactly)` : "")
+          + (e.observations.length > OBS_MAX_PER_ENTITY ? ` (over cap ${OBS_MAX_PER_ENTITY}: the next add_observations archives the oldest dated ones again, so delete stale facts first)` : "");
+      }, () => writeArchive(entityName, sections));
     },
   },
 
