@@ -29,7 +29,9 @@ jobs:
       - name: Wait for npm to serve the new version
         run: |
           version=$(node -p "require('./package.json').version")
-          for i in $(seq 1 20); do npm view "memory-lean@$version" version && exit 0; sleep 6; done
+          # npm can take several minutes to serve a version published this way
+          for i in $(seq 1 60); do npm view "memory-lean@$version" version 2>/dev/null && exit 0; sleep 10; done
+          echo "memory-lean@$version is still not on npm; run the 'publish to MCP registry' workflow by hand later"
           exit 1
       - name: Publish to the MCP registry
         run: |
