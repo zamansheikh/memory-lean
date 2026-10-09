@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- `rename_entity`: renames an entity and keeps its observations, relations and
+  archive file. This is the one tool the reference server does not have.
+- Setup guides for Cline, Zed and JetBrains IDEs (AI Assistant and Junie), and a
+  note for starting the server on Windows.
+- Windows in the CI matrix.
+
+### Fixed
+
+- The writer lock treats a lock file that Windows is still deleting as busy,
+  instead of failing the write.
+
 ## 1.2.0
 
 ### Added

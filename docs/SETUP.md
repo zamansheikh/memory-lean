@@ -21,6 +21,9 @@ open an issue.
 | VS Code (GitHub Copilot) | [mcp.json + instructions](#vs-code-github-copilot) |
 | Gemini CLI | [settings + GEMINI.md](#gemini-cli) |
 | Windsurf | [mcp_config.json + rule](#windsurf) |
+| Cline | [cline_mcp_settings.json + rule](#cline) |
+| Zed | [settings.json + rules file](#zed) |
+| JetBrains IDEs (AI Assistant, Junie) | [settings + rules](#jetbrains-ides) |
 | Claude Desktop | [config](#claude-desktop) |
 | Anything else that speaks MCP | [generic](#any-other-mcp-client) |
 
@@ -234,6 +237,84 @@ mkdir -p .windsurf/rules
 npx -y memory-lean --protocol > .windsurf/rules/memory-graph.md
 ```
 
+## Cline
+
+**1. Server.** In the Cline panel, open **MCP Servers → Configure → Configure MCP
+Servers**. This opens `cline_mcp_settings.json`; add:
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "memory-lean"],
+      "disabled": false,
+      "autoApprove": ["search_nodes", "open_nodes", "read_graph"]
+    }
+  }
+}
+```
+
+`autoApprove` lets Cline run the three read-only tools without asking each time.
+Leave it as `[]` if you prefer to approve them. With the Cline CLI the file is
+`~/.cline/data/settings/cline_mcp_settings.json`.
+
+**2. Protocol.**
+
+```bash
+mkdir -p .clinerules
+npx -y memory-lean --protocol > .clinerules/memory-graph.md
+```
+
+## Zed
+
+**1. Server.** Run **zed: open settings file** and add (or use **Settings → AI →
+MCP Servers → Add Server → Add Local Server**):
+
+```json
+{
+  "context_servers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "memory-lean"],
+      "env": {}
+    }
+  }
+}
+```
+
+**2. Protocol.** Zed reads a rules file from the project root:
+
+```bash
+npx -y memory-lean --protocol >> AGENTS.md    # or .rules
+```
+
+## JetBrains IDEs
+
+IntelliJ IDEA, PyCharm, WebStorm, Android Studio and the rest.
+
+**1. Server (AI Assistant).** Go to **Settings → Tools → AI Assistant → Model
+Context Protocol (MCP)**, click **Add**, choose the STDIO type, and paste:
+
+```json
+{
+  "mcpServers": {
+    "memory": { "command": "npx", "args": ["-y", "memory-lean"] }
+  }
+}
+```
+
+Set the server level to global to have it in every project, then **Apply**.
+
+**1. Server (Junie).** Put the same JSON in `.junie/mcp/mcp.json` in the project.
+
+**2. Protocol.**
+
+```bash
+mkdir -p .aiassistant/rules && npx -y memory-lean --protocol > .aiassistant/rules/memory-graph.md   # AI Assistant
+mkdir -p .junie && npx -y memory-lean --protocol >> .junie/guidelines.md                            # Junie
+```
+
 ## Claude Desktop
 
 **1. Server.** In `claude_desktop_config.json` (Settings → Developer → Edit Config):
@@ -261,6 +342,13 @@ env:     MEMORY_FILE_PATH=/path/to/memory.jsonl   (optional)
 
 Then put the output of `npx -y memory-lean --protocol` wherever the agent keeps
 its standing instructions.
+
+**On Windows**, some clients cannot start `npx` directly. If the server does not
+connect, use `cmd` as the command and `/c npx -y memory-lean` as the arguments:
+
+```json
+{ "command": "cmd", "args": ["/c", "npx", "-y", "memory-lean"] }
+```
 
 If you get memory-lean working with an agent that is not listed, a pull request
 adding a section here is very welcome.

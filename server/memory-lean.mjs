@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Drop-in replacement for @modelcontextprotocol/server-memory, same memory.jsonl format
-// and tool names, tuned to keep tool results small:
+// and tool names (plus rename_entity), tuned to keep tool results small:
 //   search_nodes  ranked, capped list of names + matching snippets (not full entities)
 //   open_nodes    full entities as compact text, with their relations
 //   read_graph    name index grouped by type (not the whole graph)
@@ -27,7 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const VERSION = "1.2.0"; // kept equal to package.json by a test
+const VERSION = "1.3.0"; // kept equal to package.json by a test
 
 const num = (name, fallback) => {
   const v = Number(process.env[name]);
@@ -109,12 +109,13 @@ function lock() {
       fs.closeSync(fs.openSync(LOCK, "wx"));
       return () => { try { fs.unlinkSync(LOCK); } catch {} };
     } catch (e) {
-      if (e.code !== "EEXIST") throw e;
+      // Windows reports a lock file that is being deleted as EPERM or EACCES, not EEXIST.
+      if (!["EEXIST", "EPERM", "EACCES"].includes(e.code)) throw e;
+      if (Date.now() > deadline) throw new Error(`The graph is locked by another writer (${e.code}); try again.`);
       try {
-        if (Date.now() - fs.statSync(LOCK).mtimeMs > LOCK_STALE_MS) { fs.unlinkSync(LOCK); continue; }
-      } catch { continue; }
-      if (Date.now() > deadline) throw new Error("The graph is locked by another writer; try again.");
-      sleep(10 + Math.floor(Math.random() * 20));
+        if (Date.now() - fs.statSync(LOCK).mtimeMs > LOCK_STALE_MS) fs.unlinkSync(LOCK);
+        else sleep(10 + Math.floor(Math.random() * 20));
+      } catch { sleep(5); }
     }
   }
 }
@@ -132,9 +133,11 @@ function mutate(fn) {
   } finally { unlock(); }
 }
 
+const archiveFile = name => path.join(ARCHIVE, name.replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "_") + ".md");
+
 function archive(name, observations, why) {
   fs.mkdirSync(ARCHIVE, { recursive: true });
-  const file = path.join(ARCHIVE, name.replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "_") + ".md");
+  const file = archiveFile(name);
   const stamp = new Date().toISOString().slice(0, 19).replace("T", " ");
   fs.appendFileSync(file, `\n## ${why} ${stamp} from \`${name}\`\n` + observations.map(o => `- ${o}\n`).join(""));
 }
@@ -343,6 +346,35 @@ const tools = {
             + (e.observations.length > OBS_MAX_PER_ENTITY ? ` (over cap ${OBS_MAX_PER_ENTITY}: undated facts are never archived, delete stale ones)` : ""));
         }
         return out.join("\n");
+      });
+    },
+  },
+
+  rename_entity: {
+    description: "Rename an entity, keeping its observations and every relation touching it. Fails if the new name is taken.",
+    inputSchema: { type: "object", properties: {
+      name: { type: "string", description: "Current name" }, newName: { type: "string" },
+    }, required: ["name", "newName"] },
+    run({ name, newName }) {
+      if (!str(name) || !str(newName)) throw new Error("Rejected, name and newName must be non-empty strings.");
+      if (name === newName) return "Nothing to rename.";
+      return mutate(g => {
+        const e = g.entities.find(e => e.name === name);
+        if (!e) throw new Error(`Entity not found: ${name}`);
+        if (g.entities.some(e => e.name === newName)) throw new Error(`An entity named "${newName}" already exists.`);
+        e.name = newName;
+        let rels = 0;
+        for (const r of g.relations) {
+          if (r.from === name) { r.from = newName; rels++; }
+          if (r.to === name) { r.to = newName; rels++; }
+        }
+        // Its archived observations follow it.
+        const from = archiveFile(name), to = archiveFile(newName);
+        if (from !== to && fs.existsSync(from)) {
+          fs.appendFileSync(to, fs.readFileSync(from, "utf8"));
+          fs.unlinkSync(from);
+        }
+        return `Renamed ${name} -> ${newName}; ${rels} relation end(s) updated.`;
       });
     },
   },

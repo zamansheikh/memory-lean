@@ -36,7 +36,7 @@ test("speaks MCP: initialize and tools/list", () => {
   assert.equal(init.result.serverInfo.version, JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version);
   assert.deepEqual(
     list.result.tools.map((t) => t.name).sort(),
-    ["add_observations", "create_entities", "create_relations", "delete_entities", "delete_observations", "delete_relations", "open_nodes", "read_graph", "search_nodes"],
+    ["add_observations", "create_entities", "create_relations", "delete_entities", "delete_observations", "delete_relations", "open_nodes", "read_graph", "rename_entity", "search_nodes"],
   );
   // only the three read tools are marked read-only
   assert.deepEqual(
@@ -235,4 +235,24 @@ test("--protocol prints the agent instructions and --skill writes the same text 
 test("the plugin and the package agree on the version", () => {
   const version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, "plugin", ".claude-plugin", "plugin.json"), "utf8")).version, version);
+});
+
+test("rename_entity keeps observations, relations and the archive", () => {
+  const s = session({ MEMORY_OBS_MAX: "1" });
+  s.call("create_entities", { entities: [
+    { name: "old api", entityType: "service", observations: ["2026-01-01: a", "2026-01-02: b"] },
+    { name: "app", entityType: "mobile_app", observations: [] },
+  ] });
+  s.call("create_relations", { relations: [{ from: "app", to: "old api", relationType: "talks_to" }, { from: "old api", to: "old api", relationType: "replaces" }] });
+  assert.match(s.call("rename_entity", { name: "old api", newName: "api" }).text, /Renamed old api -> api; 3 relation end\(s\) updated/);
+  const opened = s.call("open_nodes", { names: ["api"] }).text;
+  assert.match(opened, /## api \[service\]\n- 2026-01-02: b/);
+  assert.match(opened, /app -talks_to-> api\napi -replaces-> api/);
+  assert.match(s.call("open_nodes", { names: ["old api"] }).text, /Not found: "old api"/);
+  assert.deepEqual(fs.readdirSync(path.join(s.dir, "archive")), ["api.md"]);
+  assert.match(fs.readFileSync(path.join(s.dir, "archive", "api.md"), "utf8"), /2026-01-01: a/);
+  // refuses to overwrite or invent
+  assert.match(s.call("rename_entity", { name: "api", newName: "app" }).text, /already exists/);
+  assert.match(s.call("rename_entity", { name: "nope", newName: "x" }).text, /Entity not found: nope/);
+  assert.equal(s.rows().filter((r) => r.type === "entity").length, 2);
 });

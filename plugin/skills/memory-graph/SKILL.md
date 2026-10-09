@@ -67,3 +67,5 @@ passwords. Record where a secret lives, not its value.
 - Relations in the active voice: `depends_on`, `talks_to`, `part_of`, `blocks`,
   `applies_to`, `replaces`.
 - Date every observation that can go stale: `2026-01-15: deployed 1.4.0`.
+- A name turned out wrong or a project was renamed: `rename_entity`, which keeps
+  the observations and relations. Do not delete and recreate.
