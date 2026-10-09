@@ -1,0 +1,38 @@
+name: publish
+
+# Pushing a tag like v1.5.0 publishes that version to npm and then to the MCP registry.
+# npm trusts this workflow through OIDC (npmjs.com > memory-lean > Settings > Trusted
+# Publisher), so no token or one-time password is involved.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Check that the tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - run: npm test
+      - name: Publish to npm
+        run: |
+          npm install -g npm@latest
+          npm publish
+      - name: Wait for npm to serve the new version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          for i in $(seq 1 20); do npm view "memory-lean@$version" version && exit 0; sleep 6; done
+          exit 1
+      - name: Publish to the MCP registry
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
