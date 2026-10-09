@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="memory-lean">
+  <defs>
+    <linearGradient id="edge" x1="56" y1="72" x2="200" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f8bff"/>
+      <stop offset="1" stop-color="#8a6bff"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#131a2b"/>
+      <stop offset="1" stop-color="#0b0e17"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+  <rect x="1.5" y="1.5" width="253" height="253" rx="54.5" fill="none" stroke="#2a3550" stroke-width="3"/>
+  <!-- a five-node graph that reads as the letter M -->
+  <path d="M68 184V80l60 68 60-68v104" fill="none" stroke="url(#edge)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#0b0e17" stroke="url(#edge)" stroke-width="8">
+    <circle cx="68" cy="184" r="15"/>
+    <circle cx="68" cy="80" r="15"/>
+    <circle cx="188" cy="80" r="15"/>
+    <circle cx="188" cy="184" r="15"/>
+  </g>
+  <!-- the one node the agent opened -->
+  <circle cx="128" cy="148" r="30" fill="#4f8bff" opacity=".18"/>
+  <circle cx="128" cy="148" r="19" fill="#f2f5f8"/>
+</svg>

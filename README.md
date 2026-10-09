@@ -1,12 +1,33 @@
-# memory-lean
+<p align="center">
+  <img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/icon.svg" width="112" height="112" alt="memory-lean icon">
+</p>
 
-**Long-term memory for AI coding agents that doesn't burn the context window.**
+<h1 align="center">memory-lean</h1>
 
-[![test](https://github.com/zamansheikh/memory-lean/actions/workflows/test.yml/badge.svg)](https://github.com/zamansheikh/memory-lean/actions/workflows/test.yml)
-[![npm](https://img.shields.io/npm/v/memory-lean.svg)](https://www.npmjs.com/package/memory-lean)
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
-![dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
+<p align="center">
+  <strong>Long-term memory for AI coding agents that doesn't burn the context window.</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/memory-lean"><img src="https://img.shields.io/npm/v/memory-lean.svg?color=4f8bff" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/memory-lean"><img src="https://img.shields.io/npm/dm/memory-lean.svg?color=8a6bff" alt="npm downloads"></a>
+  <a href="https://github.com/zamansheikh/memory-lean/actions/workflows/test.yml"><img src="https://github.com/zamansheikh/memory-lean/actions/workflows/test.yml/badge.svg" alt="tests"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen.svg" alt="zero dependencies">
+  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="node 18 or newer">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-the-agent-sees">What the agent sees</a> ·
+  <a href="#why-it-stays-lean">Why it stays lean</a> ·
+  <a href="#tools">Tools</a> ·
+  <a href="#teach-your-agent-to-use-it">Agent protocol</a> ·
+  <a href="#settings">Settings</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
 
 memory-lean is an [MCP](https://modelcontextprotocol.io) server that gives Claude
 Code, Claude Desktop, Cursor and any other MCP client a knowledge graph that
@@ -100,28 +121,25 @@ A knowledge graph is only useful if the agent can afford to look at it, and a
 graph that every session appends to grows without limit. memory-lean limits both
 what it returns and what it stores.
 
-- **Small answers.** `search_nodes` returns at most 10 names with snippets,
-  `read_graph` returns an index of names, and only `open_nodes` returns full
-  entities.
-- **Short facts.** An observation longer than 300 characters is rejected, with a
-  message telling the agent to split it or put the detail in the repo.
-- **A cap per entity.** An entity keeps 15 observations. Past that, the oldest
-  dated ones move to `archive/<entity>.md` next to the graph. Nothing is deleted,
-  and undated observations (the identity facts) always stay.
-- **Multi-word search that works.** Every word must match somewhere in the entity,
-  so adding a word narrows the result. The reference server looks for the query as
-  one exact phrase.
+| Limit | What it means |
+|---|---|
+| **Small answers** | `search_nodes` returns at most 10 names with snippets, `read_graph` returns an index of names, and only `open_nodes` returns full entities. |
+| **Short facts** | An observation longer than 300 characters is rejected, with a message telling the agent to split it or put the detail in the repo. |
+| **A cap per entity** | An entity keeps 15 observations. Past that, the oldest dated ones move to `archive/<entity>.md` next to the graph. Nothing is deleted, and undated observations (the identity facts) always stay. |
+| **Multi-word search that works** | Every word must match somewhere in the entity, so adding a word narrows the result. The reference server looks for the query as one exact phrase. |
 
 And it is careful with the file:
 
-- **Safe to share.** Writers take a lock file, so several agent sessions can use
-  one graph without overwriting each other. Every write replaces the file
-  atomically.
-- **Daily backups.** A copy goes to `backups/` once a day; the last 7 are kept.
-- **Damaged lines are kept.** A line that cannot be read is moved to
-  `memory.jsonl.unreadable` on the next write and reported, never silently dropped.
+| Safeguard | What it means |
+|---|---|
+| **Safe to share** | Writers take a lock file, so several agent sessions can use one graph without overwriting each other. Every write replaces the file atomically. |
+| **Daily backups** | A copy goes to `backups/` once a day; the last 7 are kept. |
+| **Damaged lines are kept** | A line that cannot be read is moved to `memory.jsonl.unreadable` on the next write and reported, never silently dropped. |
+| **Plain files** | The graph is JSON lines, archives are Markdown, backups are copies. You can read, grep and edit all of it by hand. |
 
 ### Measure it on your own graph
+
+From a clone of this repo:
 
 ```bash
 node tools/bench.mjs                  # read_graph + your five most common words
@@ -190,8 +208,6 @@ All optional, set as environment variables on the server:
   record where a secret lives, not its value.
 - **Search is plain text matching**, not embeddings. Good entity names matter more
   than clever queries.
-- **Everything is a plain file.** The graph is JSON lines, archives are Markdown,
-  backups are copies. You can read, grep and edit all of it by hand.
 
 ## Roadmap
 
@@ -200,10 +216,42 @@ All optional, set as environment variables on the server:
 - [ ] Windows in the CI matrix
 - [ ] `rename_entity`, keeping relations intact
 
-Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). If
-you try it on your own graph, the output of `tools/bench.mjs` makes a useful issue
-or discussion post.
+## Contributing
+
+Ideas, bug reports and pull requests are welcome. The whole server is one file
+with no dependencies, and `npm test` runs in about a second, so a first change is
+quick to make. [CONTRIBUTING.md](CONTRIBUTING.md) has the layout, the ground rules
+and a list of good first contributions.
+
+If you try memory-lean on your own graph, the output of `tools/bench.mjs` makes a
+useful issue post. And if it saves you tokens, a ⭐ helps other people find it.
+
+## Support
+
+memory-lean is free and MIT licensed. If it is useful to you, you can support the
+work:
+
+<p>
+  <a href="https://www.buymeacoffee.com/zamansheikh"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://ko-fi.com/zamansheikh"><img src="https://img.shields.io/badge/Ko--fi-support-f16061?style=for-the-badge&logo=kofi&logoColor=white" alt="Ko-fi"></a>
+</p>
+
+## Author
+
+Created and maintained by **[Zaman Sheikh](https://zamansheikh.com)** at
+[Silifton](https://silifton.com).
+
+<p>
+  <a href="https://github.com/zamansheikh"><img src="https://img.shields.io/badge/GitHub-zamansheikh-0b0e17?logo=github&logoColor=white" alt="GitHub"></a>
+  <a href="https://x.com/zamansheikh_404"><img src="https://img.shields.io/badge/X-zamansheikh__404-0b0e17?logo=x&logoColor=white" alt="X"></a>
+  <a href="https://linkedin.com/in/zamansheikh"><img src="https://img.shields.io/badge/LinkedIn-zamansheikh-0b0e17?logo=linkedin&logoColor=4f8bff" alt="LinkedIn"></a>
+  <a href="https://zamansheikh.com"><img src="https://img.shields.io/badge/Web-zamansheikh.com-0b0e17?logo=googlechrome&logoColor=4f8bff" alt="Website"></a>
+</p>
+
+Built on the file format and tool names of the
+[Model Context Protocol reference memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 [Zaman Sheikh](https://zamansheikh.com). Free to use, change
+and share, including commercially; keep the copyright notice.

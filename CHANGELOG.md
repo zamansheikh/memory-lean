@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Project icon, reorganised README, author and funding details in the package. No change to the server.
+
 ## 1.1.0
 
 ### Fixed

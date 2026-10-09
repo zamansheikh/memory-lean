@@ -1,13 +1,20 @@
 {
   "name": "memory-lean",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A token-lean MCP memory server: a knowledge graph your AI agent can search without reading the whole thing. Drop-in replacement for @modelcontextprotocol/server-memory.",
   "type": "module",
   "bin": { "memory-lean": "server/memory-lean.mjs" },
-  "files": ["server", "docs"],
+  "files": ["server", "docs", "assets/icon.svg", "CHANGELOG.md"],
   "scripts": { "test": "node --test", "lint-graph": "node server/memory-lean.mjs --lint" },
   "engines": { "node": ">=18" },
-  "keywords": ["mcp", "model-context-protocol", "memory", "knowledge-graph", "claude", "ai-agent", "tokens"],
+  "keywords": ["mcp", "mcp-server", "model-context-protocol", "memory", "knowledge-graph", "claude", "claude-code", "cursor", "ai-agent", "tokens"],
+  "author": "Zaman Sheikh (https://zamansheikh.com)",
   "license": "MIT",
+  "homepage": "https://github.com/zamansheikh/memory-lean#readme",
+  "bugs": "https://github.com/zamansheikh/memory-lean/issues",
+  "funding": [
+    { "type": "buymeacoffee", "url": "https://www.buymeacoffee.com/zamansheikh" },
+    { "type": "ko-fi", "url": "https://ko-fi.com/zamansheikh" }
+  ],
   "repository": { "type": "git", "url": "git+https://github.com/zamansheikh/memory-lean.git" }
 }
