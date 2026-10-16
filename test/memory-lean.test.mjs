@@ -323,9 +323,13 @@ test("--ui serves the page and edits the graph, only with the token and a loopba
     assert.equal((await call("search_nodes", { query: "api" })).status, 400);
     assert.notEqual((await get("/api/stamp")).stamp, graph.stamp);
     // a page served under another host name (DNS rebinding) is refused
-    const status = await new Promise((resolve) => http.get({ host: "127.0.0.1", port: new URL(base).port, path: "/", headers: { host: "evil.example" } }, (r) => resolve(r.statusCode)));
+    const status = await new Promise((resolve, reject) => {
+      http.get({ host: "127.0.0.1", port: new URL(base).port, path: "/", agent: false, headers: { host: "evil.example" } }, (r) => { r.resume(); r.on("end", () => resolve(r.statusCode)); })
+        .on("error", reject);
+    });
     assert.equal(status, 403);
   } finally {
-    child.kill();
+    // Wait for the server to exit, so no connection to it outlives the test (Windows resets them loudly).
+    await new Promise((resolve) => { child.on("exit", resolve); child.kill(); });
   }
 });
