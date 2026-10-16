@@ -6,7 +6,7 @@
   "type": "module",
   "bin": { "memory-lean": "server/memory-lean.mjs" },
   "files": ["server", "docs", "examples", "assets/icon.svg", "CHANGELOG.md"],
-  "scripts": { "test": "node --test", "lint-graph": "node server/memory-lean.mjs --lint" },
+  "scripts": { "test": "node --test", "lint-graph": "node server/memory-lean.mjs --lint", "version": "node tools/sync-version.mjs && git add server/memory-lean.mjs plugin/.claude-plugin/plugin.json server.json" },
   "engines": { "node": ">=18" },
   "keywords": ["mcp", "mcp-server", "model-context-protocol", "memory", "knowledge-graph", "claude", "claude-code", "cursor", "ai-agent", "tokens"],
   "author": "Zaman Sheikh (https://zamansheikh.com)",

@@ -65,6 +65,16 @@ problem instead.
 - A section in `docs/SETUP.md` for an agent you use, tested on a real install.
 - Anything on the roadmap in the README.
 
+## Releasing (maintainers)
+
+```bash
+npm version minor          # or patch / major: bumps every version field, commits, tags vX.Y.Z
+git push --follow-tags     # the tag runs .github/workflows/publish.yml
+```
+
+The workflow runs the tests, publishes to npm with trusted publishing (no token),
+then updates the MCP registry. Add the release notes to `CHANGELOG.md` first.
+
 ## Reporting a bug
 
 Open an issue with the server version (`node server/memory-lean.mjs --version`),
