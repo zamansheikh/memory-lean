@@ -19,11 +19,19 @@ There is nothing to install. You need Node 18 or newer.
 |---|---|
 | `server/memory-lean.mjs` | The whole server: storage, the tools, MCP over stdio, and the command-line flags |
 | `test/memory-lean.test.mjs` | Tests that start the server and talk to it over stdio, as a client would |
+| `server/ui.html` | The web UI served by `--ui`: one self-contained page, no libraries |
+| `examples/demo-memory.jsonl` | A made-up graph for `--ui --demo` and screenshots |
 | `tools/bench.mjs` | Compares answer sizes with the reference server on a graph |
 | `docs/AGENT-PROTOCOL.md` | The agent instructions; `--protocol` and `--skill` print this file |
 | `docs/SETUP.md` | Copy-paste setup for each agent |
 | `server.json` | The entry for the official MCP registry; its version must match `package.json` |
 | `plugin/` | The Claude Code plugin; `.claude-plugin/marketplace.json` at the root lists it |
+
+To work on the web UI with the made-up example graph (reload the page after each change):
+
+```bash
+node server/memory-lean.mjs --ui --demo
+```
 
 To try a change against a throwaway graph:
 

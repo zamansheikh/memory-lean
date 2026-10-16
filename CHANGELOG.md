@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- `--ui`: a web page to explore and edit the graph. Entities are grouped by type
+  in non-overlapping bubbles; selecting one highlights its relations. Facts,
+  names, types, relations and archived facts can all be edited, through the same
+  checks the tools apply. Agent writes appear within two seconds. It listens on
+  127.0.0.1 only and every API call needs the one-time key in the printed link.
+- `--ui --demo` opens a throwaway copy of a made-up example graph
+  (`examples/demo-memory.jsonl`).
+- `/memory-ui` in the Claude Code plugin starts the web UI.
+
 ## 1.4.1
 
 - Releases are now published by a GitHub workflow (npm trusted publishing, then the MCP registry). No change to the server.

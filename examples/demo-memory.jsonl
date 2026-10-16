@@ -1,0 +1,137 @@
+{"type": "entity", "name": "storefront-web", "entityType": "project", "observations": ["Next.js storefront for the shop, deployed on Vercel", "2026-08-12: moved checkout to the new payments-service", "2026-09-02: release 3.8.0, image CDN switched to cdn-edge", "e2e tests: npm run test:e2e against the staging API"]}
+{"type": "entity", "name": "shop-mobile", "entityType": "project", "observations": ["Flutter app for iOS and Android, bundle id com.example.shop", "2026-07-30: 2.14.0 on both stores", "2026-09-18: push notifications moved to notify-service", "release builds only from CI; local builds are debug-signed"]}
+{"type": "entity", "name": "admin-console", "entityType": "project", "observations": ["React admin for orders, refunds and stock", "2026-06-11: role-based access via auth-service scopes", "2026-09-25: refund flow rewritten, needs payments-service >= 4.2"]}
+{"type": "entity", "name": "data-pipeline", "entityType": "project", "observations": ["Nightly ETL from Postgres to the warehouse", "2026-08-01: moved from cron to scheduled workflows", "row counts are checked against the source before swap"]}
+{"type": "entity", "name": "design-system", "entityType": "project", "observations": ["Shared UI kit used by storefront-web and admin-console", "2026-09-09: tokens 2.0, dark mode for every component", "Storybook at /storybook on the docs site"]}
+{"type": "entity", "name": "docs-site", "entityType": "project", "observations": ["Public developer docs, built from markdown in the monorepo", "2026-08-20: search moved to the built-in index"]}
+{"type": "entity", "name": "partner-api", "entityType": "project", "observations": ["REST API for wholesale partners, versioned /v2", "2026-09-14: rate limits per partner key", "keys are rotated every 90 days; see key location entity"]}
+{"type": "entity", "name": "support-bot", "entityType": "project", "observations": ["Answers order-status questions in the help widget", "2026-09-30: hands off to a human after two failed answers"]}
+{"type": "entity", "name": "payments-service", "entityType": "service", "observations": ["Go service wrapping the card processor", "2026-09-21: deployed 4.2.0 with partial refunds", "idempotency keys required on every charge"]}
+{"type": "entity", "name": "auth-service", "entityType": "service", "observations": ["OAuth2 + session service for every app", "2026-08-05: deployed 2.9.1, refresh tokens rotate on use"]}
+{"type": "entity", "name": "notify-service", "entityType": "service", "observations": ["Email, SMS and push fan-out", "2026-09-18: push moved here from the mobile backend", "templates live in notify-templates repo"]}
+{"type": "entity", "name": "orders-service", "entityType": "service", "observations": ["Order state machine, owns the orders table", "2026-09-03: deployed 5.1.0", "never update order status by hand; use the admin console"]}
+{"type": "entity", "name": "search-service", "entityType": "service", "observations": ["Product search on OpenSearch", "2026-07-22: synonyms file reloaded without restart"]}
+{"type": "entity", "name": "inventory-service", "entityType": "service", "observations": ["Stock levels per warehouse", "2026-09-27: deployed 1.12.0, reservations expire after 15 minutes"]}
+{"type": "entity", "name": "cdn-edge", "entityType": "service", "observations": ["Image resizing at the edge", "2026-09-02: storefront-web switched to it"]}
+{"type": "entity", "name": "@example/ui-kit", "entityType": "package", "observations": ["Published from design-system", "2026-09-09: 2.0.0, breaking token names"]}
+{"type": "entity", "name": "@example/api-client", "entityType": "package", "observations": ["Typed client for the public APIs", "2026-09-21: 4.2.0 adds refunds"]}
+{"type": "entity", "name": "@example/eslint-config", "entityType": "package", "observations": ["Shared lint rules", "2026-05-14: 1.6.0"]}
+{"type": "entity", "name": "shop_core (dart)", "entityType": "package", "observations": ["Dart package shared by shop-mobile", "2026-09-18: 3.1.0, notify client"]}
+{"type": "entity", "name": "@example/feature-flags", "entityType": "package", "observations": ["Thin wrapper over the flag service", "2026-08-28: 0.9.0"]}
+{"type": "entity", "name": "@example/telemetry", "entityType": "package", "observations": ["OpenTelemetry setup shared by all services", "2026-07-02: 1.3.0"]}
+{"type": "entity", "name": "RULE run migrations before deploy", "entityType": "rule", "observations": ["Deploy fails half-way if the schema is behind; run the migration job first", "2026-04-12: learned from the orders outage"]}
+{"type": "entity", "name": "RULE never log card data", "entityType": "rule", "observations": ["Payment payloads are redacted by the logger middleware; do not bypass it"]}
+{"type": "entity", "name": "RULE bump api-client with the API", "entityType": "rule", "observations": ["Every API change ships a matching @example/api-client release"]}
+{"type": "entity", "name": "RULE release from CI only", "entityType": "rule", "observations": ["Local builds are signed with debug keys; store uploads come from CI"]}
+{"type": "entity", "name": "RULE feature flags for risky changes", "entityType": "rule", "observations": ["Ship behind a flag, enable for staff, then 10%, then everyone"]}
+{"type": "entity", "name": "RULE one fact per observation", "entityType": "rule", "observations": ["Keep graph facts short; details go in the repo docs"]}
+{"type": "entity", "name": "RULE test refunds in sandbox", "entityType": "rule", "observations": ["Refund paths are tested against the processor sandbox, never live"]}
+{"type": "entity", "name": "RULE keep design tokens in sync", "entityType": "rule", "observations": ["Token changes land in design-system first, then each app updates"]}
+{"type": "entity", "name": "RULE no secrets in the graph", "entityType": "rule", "observations": ["Record where a secret lives, never its value"]}
+{"type": "entity", "name": "RULE rotate partner keys every 90 days", "entityType": "rule", "observations": ["Rotation script: scripts/rotate-partner-keys.ts"]}
+{"type": "entity", "name": "RULE staging mirrors production config", "entityType": "rule", "observations": ["Differences between staging and prod caused two incidents in 2026"]}
+{"type": "entity", "name": "RULE image sizes through cdn-edge", "entityType": "rule", "observations": ["Do not ship resized images in the bundle"]}
+{"type": "entity", "name": "PENDING ui-kit 2.0", "entityType": "pending", "observations": ["2026-09-09: tokens renamed; consumers must update imports"]}
+{"type": "entity", "name": "PENDING api-client 4.2.0", "entityType": "pending", "observations": ["2026-09-21: refunds endpoint; admin-console and partner-api to update"]}
+{"type": "entity", "name": "PENDING notify templates v3", "entityType": "pending", "observations": ["2026-09-28: new layout; storefront-web and shop-mobile copy to review"]}
+{"type": "entity", "name": "PENDING auth refresh rotation", "entityType": "pending", "observations": ["2026-08-05: clients must handle rotated refresh tokens"]}
+{"type": "entity", "name": "Pixel 8 (test)", "entityType": "device", "observations": ["Android 15 test phone on the office rack"]}
+{"type": "entity", "name": "iPhone 15 (test)", "entityType": "device", "observations": ["iOS 18 test phone, TestFlight builds"]}
+{"type": "entity", "name": "Staging VPS", "entityType": "device", "observations": ["Hosts staging for every service", "2026-09-01: upgraded to 8 GB RAM"]}
+{"type": "entity", "name": "payments keys location", "entityType": "key_location", "observations": ["Processor keys live in the vault under payments/; never in .env files"]}
+{"type": "entity", "name": "partner keys location", "entityType": "key_location", "observations": ["Partner API keys in the vault under partners/<id>"]}
+{"type": "entity", "name": "runbook: incidents", "entityType": "doc", "observations": ["docs/runbooks/incidents.md: who to page, how to roll back"]}
+{"type": "entity", "name": "runbook: releases", "entityType": "doc", "observations": ["docs/runbooks/releases.md: the release checklist"]}
+{"type": "relation", "from": "storefront-web", "to": "@example/ui-kit", "relationType": "depends_on"}
+{"type": "relation", "from": "admin-console", "to": "@example/ui-kit", "relationType": "depends_on"}
+{"type": "relation", "from": "docs-site", "to": "@example/ui-kit", "relationType": "depends_on"}
+{"type": "relation", "from": "storefront-web", "to": "@example/api-client", "relationType": "depends_on"}
+{"type": "relation", "from": "admin-console", "to": "@example/api-client", "relationType": "depends_on"}
+{"type": "relation", "from": "partner-api", "to": "@example/api-client", "relationType": "depends_on"}
+{"type": "relation", "from": "support-bot", "to": "@example/api-client", "relationType": "depends_on"}
+{"type": "relation", "from": "storefront-web", "to": "@example/eslint-config", "relationType": "depends_on"}
+{"type": "relation", "from": "admin-console", "to": "@example/eslint-config", "relationType": "depends_on"}
+{"type": "relation", "from": "docs-site", "to": "@example/eslint-config", "relationType": "depends_on"}
+{"type": "relation", "from": "design-system", "to": "@example/eslint-config", "relationType": "depends_on"}
+{"type": "relation", "from": "shop-mobile", "to": "shop_core (dart)", "relationType": "depends_on"}
+{"type": "relation", "from": "storefront-web", "to": "@example/feature-flags", "relationType": "depends_on"}
+{"type": "relation", "from": "shop-mobile", "to": "@example/feature-flags", "relationType": "depends_on"}
+{"type": "relation", "from": "admin-console", "to": "@example/feature-flags", "relationType": "depends_on"}
+{"type": "relation", "from": "payments-service", "to": "@example/telemetry", "relationType": "depends_on"}
+{"type": "relation", "from": "auth-service", "to": "@example/telemetry", "relationType": "depends_on"}
+{"type": "relation", "from": "notify-service", "to": "@example/telemetry", "relationType": "depends_on"}
+{"type": "relation", "from": "orders-service", "to": "@example/telemetry", "relationType": "depends_on"}
+{"type": "relation", "from": "search-service", "to": "@example/telemetry", "relationType": "depends_on"}
+{"type": "relation", "from": "inventory-service", "to": "@example/telemetry", "relationType": "depends_on"}
+{"type": "relation", "from": "design-system", "to": "@example/ui-kit", "relationType": "publishes"}
+{"type": "relation", "from": "storefront-web", "to": "payments-service", "relationType": "talks_to"}
+{"type": "relation", "from": "storefront-web", "to": "orders-service", "relationType": "talks_to"}
+{"type": "relation", "from": "storefront-web", "to": "search-service", "relationType": "talks_to"}
+{"type": "relation", "from": "storefront-web", "to": "auth-service", "relationType": "talks_to"}
+{"type": "relation", "from": "storefront-web", "to": "cdn-edge", "relationType": "talks_to"}
+{"type": "relation", "from": "shop-mobile", "to": "orders-service", "relationType": "talks_to"}
+{"type": "relation", "from": "shop-mobile", "to": "auth-service", "relationType": "talks_to"}
+{"type": "relation", "from": "shop-mobile", "to": "notify-service", "relationType": "talks_to"}
+{"type": "relation", "from": "shop-mobile", "to": "search-service", "relationType": "talks_to"}
+{"type": "relation", "from": "admin-console", "to": "orders-service", "relationType": "talks_to"}
+{"type": "relation", "from": "admin-console", "to": "payments-service", "relationType": "talks_to"}
+{"type": "relation", "from": "admin-console", "to": "inventory-service", "relationType": "talks_to"}
+{"type": "relation", "from": "admin-console", "to": "auth-service", "relationType": "talks_to"}
+{"type": "relation", "from": "partner-api", "to": "orders-service", "relationType": "talks_to"}
+{"type": "relation", "from": "partner-api", "to": "inventory-service", "relationType": "talks_to"}
+{"type": "relation", "from": "support-bot", "to": "orders-service", "relationType": "talks_to"}
+{"type": "relation", "from": "data-pipeline", "to": "orders-service", "relationType": "talks_to"}
+{"type": "relation", "from": "data-pipeline", "to": "inventory-service", "relationType": "talks_to"}
+{"type": "relation", "from": "orders-service", "to": "payments-service", "relationType": "talks_to"}
+{"type": "relation", "from": "orders-service", "to": "inventory-service", "relationType": "talks_to"}
+{"type": "relation", "from": "orders-service", "to": "notify-service", "relationType": "talks_to"}
+{"type": "relation", "from": "RULE run migrations before deploy", "to": "orders-service", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE run migrations before deploy", "to": "payments-service", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE run migrations before deploy", "to": "inventory-service", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE run migrations before deploy", "to": "auth-service", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE never log card data", "to": "payments-service", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE never log card data", "to": "storefront-web", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE never log card data", "to": "admin-console", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE bump api-client with the API", "to": "@example/api-client", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE bump api-client with the API", "to": "partner-api", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE release from CI only", "to": "shop-mobile", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE release from CI only", "to": "storefront-web", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE feature flags for risky changes", "to": "storefront-web", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE feature flags for risky changes", "to": "shop-mobile", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE feature flags for risky changes", "to": "admin-console", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE test refunds in sandbox", "to": "payments-service", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE test refunds in sandbox", "to": "admin-console", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE keep design tokens in sync", "to": "design-system", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE keep design tokens in sync", "to": "storefront-web", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE keep design tokens in sync", "to": "admin-console", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE rotate partner keys every 90 days", "to": "partner-api", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE staging mirrors production config", "to": "Staging VPS", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE image sizes through cdn-edge", "to": "storefront-web", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE image sizes through cdn-edge", "to": "cdn-edge", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE no secrets in the graph", "to": "payments keys location", "relationType": "applies_to"}
+{"type": "relation", "from": "RULE no secrets in the graph", "to": "partner keys location", "relationType": "applies_to"}
+{"type": "relation", "from": "PENDING ui-kit 2.0", "to": "storefront-web", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING ui-kit 2.0", "to": "admin-console", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING ui-kit 2.0", "to": "docs-site", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING api-client 4.2.0", "to": "admin-console", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING api-client 4.2.0", "to": "partner-api", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING notify templates v3", "to": "storefront-web", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING notify templates v3", "to": "shop-mobile", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING auth refresh rotation", "to": "shop-mobile", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING auth refresh rotation", "to": "support-bot", "relationType": "blocks"}
+{"type": "relation", "from": "PENDING ui-kit 2.0", "to": "@example/ui-kit", "relationType": "tracks"}
+{"type": "relation", "from": "PENDING api-client 4.2.0", "to": "@example/api-client", "relationType": "tracks"}
+{"type": "relation", "from": "Pixel 8 (test)", "to": "shop-mobile", "relationType": "tests"}
+{"type": "relation", "from": "iPhone 15 (test)", "to": "shop-mobile", "relationType": "tests"}
+{"type": "relation", "from": "payments-service", "to": "Staging VPS", "relationType": "runs_on"}
+{"type": "relation", "from": "auth-service", "to": "Staging VPS", "relationType": "runs_on"}
+{"type": "relation", "from": "orders-service", "to": "Staging VPS", "relationType": "runs_on"}
+{"type": "relation", "from": "inventory-service", "to": "Staging VPS", "relationType": "runs_on"}
+{"type": "relation", "from": "notify-service", "to": "Staging VPS", "relationType": "runs_on"}
+{"type": "relation", "from": "search-service", "to": "Staging VPS", "relationType": "runs_on"}
+{"type": "relation", "from": "payments-service", "to": "payments keys location", "relationType": "keys_in"}
+{"type": "relation", "from": "partner-api", "to": "partner keys location", "relationType": "keys_in"}
+{"type": "relation", "from": "runbook: incidents", "to": "orders-service", "relationType": "covers"}
+{"type": "relation", "from": "runbook: incidents", "to": "payments-service", "relationType": "covers"}
+{"type": "relation", "from": "runbook: releases", "to": "shop-mobile", "relationType": "covers"}
+{"type": "relation", "from": "runbook: releases", "to": "storefront-web", "relationType": "covers"}

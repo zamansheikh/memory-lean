@@ -44,7 +44,8 @@ no context until the agent decides to load it, but the agent has to decide. If y
 want the graph consulted on every task, use the rules file.
 
 The graph lives at `~/.claude/memory-graph/memory.jsonl` whichever agent writes to
-it, so several agents can share one memory. Set `MEMORY_FILE_PATH` on the server
+it, so several agents can share one memory. To see and edit it yourself, run
+`npx -y memory-lean --ui`. Set `MEMORY_FILE_PATH` on the server
 to keep it somewhere else.
 
 ---

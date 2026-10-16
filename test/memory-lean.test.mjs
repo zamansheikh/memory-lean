@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -284,4 +285,47 @@ test("archived observations can be listed, searched and restored", () => {
   // restoring the last one removes the archive file
   s.call("archived_observations", { entityName: "api", restore: ["2026-01-01: deployed 1.0"] });
   assert.deepEqual(fs.readdirSync(path.join(s.dir, "archive")), []);
+});
+
+test("--ui serves the page and edits the graph, only with the token and a loopback host", async () => {
+  const s = session();
+  s.call("create_entities", { entities: [{ name: "api", entityType: "service", observations: ["one", "two"] }] });
+  const child = spawn("node", [SERVER, "--ui", "0", "--no-open"], { env: s.env });
+  try {
+    const link = await new Promise((resolve, reject) => {
+      let out = "";
+      child.stdout.on("data", (d) => { out += d; const m = out.match(/http:\/\/127\.0\.0\.1:\d+\/#\S+/); if (m) resolve(m[0]); });
+      child.on("exit", () => reject(new Error(`--ui exited: ${out}`)));
+    });
+    const [base, token] = link.split("/#");
+    const page = await fetch(`${base}/`);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get("content-security-policy"), /default-src 'none'/);
+    assert.match(await page.text(), /<title>memory-lean<\/title>/);
+    assert.equal((await fetch(`${base}/api/graph`)).status, 401);
+    const headers = { "x-memory-lean-token": token, "content-type": "application/json" };
+    const get = (p) => fetch(base + p, { headers }).then((r) => r.json());
+    const call = (tool, args) => fetch(`${base}/api/call`, { method: "POST", headers, body: JSON.stringify({ tool, args }) })
+      .then(async (r) => ({ status: r.status, ...(await r.json()) }));
+
+    const graph = await get("/api/graph");
+    assert.deepEqual(graph.entities.map((e) => [e.name, e.observations.length, e.archived]), [["api", 2, 0]]);
+    assert.deepEqual(graph.limits, { obsMaxChars: 300, obsMax: 15 });
+    // edits the MCP tools do not have: in-place edit (keeps the order) and changing the type
+    assert.match((await call("replace_observation", { entityName: "api", old: "one", text: "uno" })).text, /updated/);
+    assert.match((await call("set_type", { name: "api", entityType: "backend" })).text, /service -> backend/);
+    assert.deepEqual(s.rows()[0], { type: "entity", name: "api", entityType: "backend", observations: ["uno", "two"] });
+    // the regular tools work too, with the same limits
+    assert.match((await call("add_observations", { observations: [{ entityName: "api", contents: ["three"] }] })).text, /api: \+1/);
+    const long = await call("replace_observation", { entityName: "api", old: "two", text: "x".repeat(301) });
+    assert.equal(long.status, 400);
+    assert.match(long.text, /over 300 chars/);
+    assert.equal((await call("search_nodes", { query: "api" })).status, 400);
+    assert.notEqual((await get("/api/stamp")).stamp, graph.stamp);
+    // a page served under another host name (DNS rebinding) is refused
+    const status = await new Promise((resolve) => http.get({ host: "127.0.0.1", port: new URL(base).port, path: "/", headers: { host: "evil.example" } }, (r) => resolve(r.statusCode)));
+    assert.equal(status, 403);
+  } finally {
+    child.kill();
+  }
 });

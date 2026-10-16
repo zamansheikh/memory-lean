@@ -6,3 +6,6 @@ archive/
 backups/
 node_modules/
 .DS_Store
+
+# The demo graph is made up and meant to be committed.
+!examples/*.jsonl

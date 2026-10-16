@@ -14,6 +14,8 @@
 //   --compact   back up, then move overflow observations to archive/
 //   --protocol  print the agent instructions (append them to AGENTS.md, CLAUDE.md, ...)
 //   --skill DIR write the same instructions as an Agent Skill into DIR/memory-graph
+//   --ui [PORT] open a local web page to explore and edit the graph (--no-open: just print the link;
+//               --demo: a throwaway copy of a made-up example graph instead of yours)
 //   --version
 //
 // Environment (all optional):
@@ -22,12 +24,15 @@
 //   MEMORY_OBS_MAX          observations kept per entity before archiving (default 15)
 //   MEMORY_SEARCH_LIMIT     default number of search results (default 10)
 //   MEMORY_BACKUPS_KEPT     daily backups kept (default 7)
+import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const VERSION = "1.4.1"; // kept equal to package.json by a test
+const VERSION = "1.5.0"; // kept equal to package.json by a test
 
 const num = (name, fallback) => {
   const v = Number(process.env[name]);
@@ -593,14 +598,125 @@ function writeSkill(dir) {
   console.log(`Wrote ${file}`);
 }
 
+// ---------- web UI ----------
+// --ui serves server/ui.html on 127.0.0.1. Changes go through the same tools MCP clients use, plus
+// two edits the tools lack, so the lock, limits and cap all apply. Only this machine can connect,
+// the Host header must be the loopback address (no DNS rebinding), and every API call needs the
+// token from the printed link in a custom header, which other websites cannot send.
+const UI_DEFAULT_PORT = 6366;
+const UI_TOOLS = new Set(["create_entities", "create_relations", "add_observations", "archived_observations",
+  "rename_entity", "delete_entities", "delete_observations", "delete_relations"]);
+
+const uiEdits = {
+  set_type({ name, entityType }) {
+    if (!str(name) || !str(entityType)) throw new Error("Rejected, name and entityType must be non-empty strings.");
+    return mutate(g => {
+      const e = g.entities.find(e => e.name === name);
+      if (!e) throw new Error(`Entity not found: ${name}`);
+      const was = e.entityType;
+      e.entityType = entityType;
+      return `${name}: type ${was} -> ${entityType}`;
+    });
+  },
+  // Edit in place, keeping the observation's position (delete + add would move it to the end).
+  replace_observation({ entityName, old, text }) {
+    if (!str(entityName) || typeof old !== "string" || !str(text)) throw new Error("Rejected, entityName, old and text are required.");
+    rejectObservations(badObservations(entityName, [text]));
+    return mutate(g => {
+      const e = g.entities.find(e => e.name === entityName);
+      if (!e) throw new Error(`Entity not found: ${entityName}`);
+      const i = e.observations.indexOf(old);
+      if (i < 0) throw new Error("That observation changed in the meantime; reload and try again.");
+      if (text !== old && e.observations.includes(text)) throw new Error("The entity already has that observation.");
+      e.observations[i] = text;
+      return `${entityName}: observation updated`;
+    });
+  },
+};
+
+const uiStamp = () => { try { const s = fs.statSync(FILE); return `${s.mtimeMs}:${s.size}`; } catch { return "none"; } };
+
+function uiSnapshot() {
+  const g = load();
+  let files = new Set();
+  try { files = new Set(fs.readdirSync(ARCHIVE)); } catch {}
+  return {
+    file: FILE, version: VERSION, stamp: uiStamp(), unreadable: g.unreadable.length,
+    limits: { obsMaxChars: OBS_MAX_CHARS, obsMax: OBS_MAX_PER_ENTITY },
+    entities: g.entities.map(e => ({ ...e, archived: files.has(path.basename(archiveFile(e.name))) ? archivedOf(e.name).length : 0 })),
+    relations: g.relations,
+  };
+}
+
+function startUi(fixedPort, openBrowser) {
+  const page = fs.readFileSync(new URL("ui.html", import.meta.url), "utf8");
+  const token = crypto.randomBytes(24).toString("base64url");
+  const server = http.createServer((req, res) => {
+    const reply = (status, body, type = "application/json; charset=utf-8") => {
+      res.writeHead(status, {
+        "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
+        ...(type.startsWith("text/html") && { "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" }),
+      });
+      res.end(typeof body === "string" ? body : JSON.stringify(body));
+    };
+    const port = server.address().port;
+    if (req.headers.host !== `127.0.0.1:${port}` && req.headers.host !== `localhost:${port}`) return reply(403, { ok: false, text: "Forbidden host." });
+    const url = new URL(req.url, "http://127.0.0.1");
+    if (req.method === "GET" && url.pathname === "/") return reply(200, page, "text/html; charset=utf-8");
+    if (!url.pathname.startsWith("/api/")) return reply(404, { ok: false, text: "Not found." });
+    if (req.headers["x-memory-lean-token"] !== token) return reply(401, { ok: false, text: "Missing or wrong token: open the link printed by memory-lean --ui." });
+    try {
+      if (req.method === "GET" && url.pathname === "/api/graph") return reply(200, uiSnapshot());
+      if (req.method === "GET" && url.pathname === "/api/stamp") return reply(200, { stamp: uiStamp() });
+      if (req.method === "GET" && url.pathname === "/api/archive") return reply(200, { items: archivedOf(url.searchParams.get("name") || "") });
+      if (req.method !== "POST" || url.pathname !== "/api/call") return reply(404, { ok: false, text: "Not found." });
+    } catch (e) { return reply(500, { ok: false, text: String(e.message || e) }); }
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
+    req.on("end", () => {
+      let call;
+      try { call = JSON.parse(body); } catch { return reply(400, { ok: false, text: "Bad JSON." }); }
+      const run = UI_TOOLS.has(call?.tool) ? tools[call.tool].run : Object.hasOwn(uiEdits, call?.tool) ? uiEdits[call.tool] : null;
+      if (!run) return reply(400, { ok: false, text: `Unknown tool: ${call?.tool}` });
+      try { reply(200, { ok: true, text: run(call.args || {}) }); } catch (e) { reply(400, { ok: false, text: String(e.message || e) }); }
+    });
+  });
+  server.on("listening", () => {
+    const link = `http://127.0.0.1:${server.address().port}/#${token}`;
+    console.log(`memory-lean ${VERSION}: ${FILE}\n${link}\nCtrl+C to stop.`);
+    if (!openBrowser) return;
+    const [cmd, args] = process.platform === "darwin" ? ["open", [link]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", link]] : ["xdg-open", [link]];
+    try { spawn(cmd, args, { stdio: "ignore", detached: true }).on("error", () => {}).unref(); } catch {}
+  });
+  server.on("error", e => {
+    if (e.code === "EADDRINUSE" && fixedPort === undefined) return server.listen(0, "127.0.0.1");
+    console.error(`memory-lean --ui: ${e.message}`);
+    process.exitCode = 1;
+  });
+  server.listen(fixedPort ?? UI_DEFAULT_PORT, "127.0.0.1");
+}
+
 const arg = process.argv[2];
 if (!arg) serve();
 else if (arg === "--lint") lint(false);
 else if (arg === "--compact") lint(true);
 else if (arg === "--protocol") process.stdout.write(protocolText() || "");
 else if (arg === "--skill") writeSkill(process.argv[3]);
+else if (arg === "--ui" && process.argv.includes("--demo")) {
+  // A throwaway copy of the made-up example graph, so trying the UI never touches real memory.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "memory-lean-demo-"));
+  fs.copyFileSync(new URL("../examples/demo-memory.jsonl", import.meta.url), path.join(dir, "memory.jsonl"));
+  const args = process.argv.slice(2).filter(a => a !== "--demo");
+  spawn(process.execPath, [process.argv[1], ...args], { stdio: "inherit", env: { ...process.env, MEMORY_FILE_PATH: path.join(dir, "memory.jsonl") } })
+    .on("exit", code => { process.exitCode = code ?? 0; });
+}
+else if (arg === "--ui") {
+  const rest = process.argv.slice(3), port = rest.find(a => /^\d+$/.test(a));
+  startUi(port === undefined ? undefined : Number(port), !rest.includes("--no-open"));
+}
 else if (arg === "--version" || arg === "-v") console.log(VERSION);
 else {
-  console.log("memory-lean [--lint | --compact | --protocol | --skill <dir> | --version]\nWith no arguments, serves MCP over stdio. See README.md.");
+  console.log("memory-lean [--ui [port] [--demo] | --lint | --compact | --protocol | --skill <dir> | --version]\nWith no arguments, serves MCP over stdio. See README.md.");
   process.exitCode = arg === "--help" || arg === "-h" ? 0 : 2;
 }

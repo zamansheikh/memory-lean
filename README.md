@@ -1,60 +1,118 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/icon.svg" width="112" height="112" alt="memory-lean icon">
+  <img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/icon.svg" width="104" height="104" alt="memory-lean icon">
 </p>
 
 <h1 align="center">memory-lean</h1>
 
 <p align="center">
-  <strong>Long-term memory for AI coding agents that doesn't burn the context window.</strong>
+  <strong>Long-term memory for AI coding agents that doesn't burn the context window.</strong><br>
+  A knowledge graph your agent searches cheaply, and a web UI where you can see and edit all of it.
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/memory-lean"><img src="https://img.shields.io/npm/v/memory-lean.svg?color=4f8bff" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/memory-lean"><img src="https://img.shields.io/npm/dm/memory-lean.svg?color=8a6bff" alt="npm downloads"></a>
   <a href="https://github.com/zamansheikh/memory-lean/actions/workflows/test.yml"><img src="https://github.com/zamansheikh/memory-lean/actions/workflows/test.yml/badge.svg" alt="tests"></a>
+  <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.zamansheikh/memory-lean"><img src="https://img.shields.io/badge/MCP%20registry-listed-2ec4b6.svg" alt="listed in the MCP registry"></a>
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen.svg" alt="zero dependencies">
-  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="node 18 or newer">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#what-the-agent-sees">What the agent sees</a> ·
-  <a href="#why-it-stays-lean">Why it stays lean</a> ·
+  <a href="#web-ui">Web UI</a> ·
+  <a href="#how-it-works">How it works</a> ·
   <a href="#tools">Tools</a> ·
-  <a href="#teach-your-agent-to-use-it">Agent protocol</a> ·
-  <a href="#settings">Settings</a> ·
+  <a href="docs/SETUP.md">Setup for 12 agents</a> ·
   <a href="#contributing">Contributing</a>
 </p>
 
----
+<p align="center">
+  <img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/demo.gif" width="900" alt="A tour of the memory-lean web UI: hovering an entity, selecting one to highlight its relations, searching, editing a fact, and switching between the free layout and the layout grouped by type">
+</p>
 
 memory-lean is an [MCP](https://modelcontextprotocol.io) server that gives Claude
-Code, Claude Desktop, Cursor and any other MCP client a knowledge graph that
-persists between sessions. It is a drop-in replacement for the reference memory
-server ([`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory)):
-same `memory.jsonl` file, same nine tool names, plus two extras. What changes is
-how much the tools send back.
+Code, Codex, Cursor, MiMo Code and any other MCP client a memory that lasts between
+sessions: which projects exist, what depends on what, which version shipped, what
+is still pending, and which rules were learned the hard way. It is a drop-in
+replacement for the reference memory server
+([`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory)),
+with the same file and tool names, but its answers are about 40 times smaller.
 
-| Call, on a real graph of 237 entities | Reference server | memory-lean | |
+## Highlights
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**About 40× smaller answers.** Search returns a ranked list of names and the lines
+that matched, not every entity in full, so the agent can afford to check its
+memory before every task.
+
+</td>
+<td width="50%" valign="top">
+
+**A web UI for people.** See the whole graph grouped by type, follow relations,
+and add, edit or delete anything. Agent writes show up live.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Drop-in replacement.** Same `memory.jsonl` file and the same nine tools as the
+reference server. Switch in, and switch back whenever you like.
+
+</td>
+<td valign="top">
+
+**Works with every agent.** Copy-paste setup for Claude Code, MiMo Code, Codex,
+Cursor, Copilot, Gemini CLI, Zed, JetBrains and more, plus the instructions that
+teach the agent to use it.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Stays small by itself.** Short facts, a cap per entity, and an archive for the
+overflow, so the graph never grows into a wall of text.
+
+</td>
+<td valign="top">
+
+**Private and safe.** Plain local files, daily backups, a write lock for parallel
+sessions, and no network access. One server file, zero dependencies.
+
+</td>
+</tr>
+</table>
+
+## The numbers
+
+Measured on a real graph of 237 entities, 355 relations and 1,160 facts
+(tokens ≈ characters ÷ 4):
+
+| Call | Reference server | memory-lean | |
 |---|---:|---:|---:|
 | `read_graph` | ~77,800 tokens | ~2,000 tokens | **40× smaller** |
-| `search_nodes` (average of 5 common words) | ~31,000 tokens | ~770 tokens | **40× smaller** |
+| `search_nodes`, average of 5 common words | ~31,000 tokens | ~770 tokens | **40× smaller** |
 
-One file. No dependencies. Nothing to build.
+A narrow search that matches one or two entities saves less, because there is
+little to trim. To measure your own graph, run `node tools/bench.mjs` from a clone;
+it is read-only and prints sizes, never content.
 
 ## Quick start
 
-**Claude Code**: install the plugin. It adds the server, a skill with the agent
-instructions, and a short reminder at the start of each session.
+**Claude Code**: install the plugin. It adds the server, the instructions as a
+skill, a short reminder at the start of each session, and `/memory-ui`.
 
 ```text
 /plugin marketplace add zamansheikh/memory-lean
 /plugin install memory-lean@memory-lean
 ```
 
-**Any other agent**: add the server to the agent's MCP config, then give the agent
-the instructions.
+**Any other agent**: add the server to its MCP config, then give it the instructions.
 
 ```json
 {
@@ -68,9 +126,16 @@ the instructions.
 npx -y memory-lean --protocol >> AGENTS.md   # into the rules file your agent reads
 ```
 
-The config file and its exact shape differ per agent.
+**Just looking?** Open the web UI on a made-up example graph:
 
-Copy-paste setup for each agent is in **[docs/SETUP.md](docs/SETUP.md)**:
+```bash
+npx -y memory-lean --ui --demo
+```
+
+<details>
+<summary><b>Setup for each agent</b></summary>
+
+<br>
 
 | Agent | Server config | Instructions |
 |---|---|---|
@@ -87,22 +152,56 @@ Copy-paste setup for each agent is in **[docs/SETUP.md](docs/SETUP.md)**:
 | [JetBrains IDEs](docs/SETUP.md#jetbrains-ides) | AI Assistant settings | a rule or guidelines |
 | [Claude Desktop](docs/SETUP.md#claude-desktop) | `claude_desktop_config.json` | project instructions |
 
-The graph is created on the first write at `~/.claude/memory-graph/memory.jsonl`,
-whichever agent writes to it, so several agents can share one memory. Set
-`MEMORY_FILE_PATH` to keep it somewhere else.
-
-<details>
-<summary>Run from a clone instead of npm</summary>
-
-```bash
-git clone https://github.com/zamansheikh/memory-lean.git
-claude mcp add --scope user memory -- node /absolute/path/to/memory-lean/server/memory-lean.mjs
-```
-
-No `npm install` is needed.
 </details>
 
-## What the agent sees
+The graph is created on the first write at `~/.claude/memory-graph/memory.jsonl`,
+whichever agent writes it, so all your agents share one memory. Set
+`MEMORY_FILE_PATH` to keep it somewhere else.
+
+## Web UI
+
+```bash
+npx -y memory-lean --ui
+```
+
+This opens your memory in the browser. Everything an agent can do, you can do here:
+
+- **Explore.** Each type gets its own bubble. Click an entity to highlight
+  everything it connects to, drag nodes to arrange them, and scroll to zoom.
+  Search matches names, types and facts.
+- **Edit.** Add, edit and delete facts, rename an entity or change its type, add
+  and remove relations, create and delete entities, and restore archived facts.
+  Every change passes the same checks as the agents' tools.
+- **Watch.** Changes your agents make appear within two seconds.
+- **Spot problems.** The overview lists pending work, the most connected
+  entities, and anything over budget, which is also marked on the graph.
+
+<table>
+<tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/ui-entity.png" alt="An entity selected: its relations highlighted on the graph and listed in the side panel"></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/ui-search.png" alt="Searching for payments: matching entities stay bright, the rest fade"></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Follow the connections.</b> Select an entity to see its facts and relations.</sub></td>
+<td align="center"><sub><b>Find anything.</b> Search names, types and facts at once.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/ui-edit.png" alt="Editing a fact in place, with a character counter"></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/zamansheikh/memory-lean/main/assets/ui-light.png" alt="The web UI in the light theme"></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Edit in place.</b> With the same 300-character limit the agents have.</sub></td>
+<td align="center"><sub><b>Light or dark.</b> It follows your system, or pick one.</sub></td>
+</tr>
+</table>
+
+The page runs on your machine only (`127.0.0.1`) and needs the one-time key in
+the link it prints, so other websites cannot read or change your memory. Nothing
+is uploaded anywhere.
+
+## How it works
+
+### Search, then open
 
 The reference server answers a search with every matching entity in full, as
 pretty-printed JSON. memory-lean answers with a ranked list of names and the lines
@@ -124,7 +223,7 @@ The agent then opens only what it needs:
 ```text
 > open_nodes { "names": ["shop-backend"] }
 
-## shop-backend [service]
+## shop-backend [service] (3 archived)
 - NestJS API behind api.example.com
 - 2026-03-02: deployed 2.4.0 to production
 
@@ -133,22 +232,16 @@ shop-app -talks_to-> shop-backend
 PENDING shop-backend 2.4.0 -blocks-> shop-app
 ```
 
-That is the whole pattern: **search, then open.**
-
-## Why it stays lean
-
-A knowledge graph is only useful if the agent can afford to look at it, and a
-graph that every session appends to grows without limit. memory-lean limits both
-what it returns and what it stores.
+### Why it stays lean
 
 | Limit | What it means |
 |---|---|
 | **Small answers** | `search_nodes` returns at most 10 names with snippets, `read_graph` returns an index of names, and only `open_nodes` returns full entities. |
 | **Short facts** | An observation longer than 300 characters is rejected, with a message telling the agent to split it or put the detail in the repo. |
-| **A cap per entity** | An entity keeps 15 observations. Past that, the oldest dated ones move to `archive/<entity>.md` next to the graph. Nothing is deleted: the agent can list and restore them, and undated observations (the identity facts) always stay. |
-| **Multi-word search that works** | Every word must match somewhere in the entity, so adding a word narrows the result. The reference server looks for the query as one exact phrase. |
+| **A cap per entity** | An entity keeps 15 observations. Past that, the oldest dated ones move to `archive/<entity>.md`. Nothing is deleted: they can be listed and restored, and undated facts (the identity facts) always stay. |
+| **Search that narrows** | Every word must match somewhere in the entity, so adding a word narrows the result. The reference server looks for the query as one exact phrase. |
 
-And it is careful with the file:
+### How it keeps your data safe
 
 | Safeguard | What it means |
 |---|---|
@@ -157,37 +250,38 @@ And it is careful with the file:
 | **Damaged lines are kept** | A line that cannot be read is moved to `memory.jsonl.unreadable` on the next write and reported, never silently dropped. |
 | **Plain files** | The graph is JSON lines, archives are Markdown, backups are copies. You can read, grep and edit all of it by hand. |
 
-### Measure it on your own graph
-
-From a clone of this repo:
-
-```bash
-node tools/bench.mjs                  # read_graph + your five most common words
-node tools/bench.mjs deploy "api v2"  # your own queries
-```
-
-It is read-only and prints sizes, never content. Tokens are estimated as
-characters ÷ 4. A narrow search that matches one or two entities saves much less,
-because there was little to trim.
-
 ## Tools
 
 | Tool | What it returns |
 |---|---|
 | `search_nodes` | Ranked list of entity names with counts and up to two matching snippets each. Every word must match the name, type, an observation, or the type of a relation touching the entity. |
-| `open_nodes` | The full entities you name, as compact text, with every relation touching them. Unknown names come back with "did you mean" suggestions. |
+| `open_nodes` | The full entities you name, as compact text, with every relation touching them and their archive count. Unknown names come back with "did you mean" suggestions. |
 | `read_graph` | An index: entity names grouped by type, with observation counts. Never the observations. |
 | `create_entities` | Creates entities; existing names are skipped. |
 | `create_relations` | Creates relations between existing entities; duplicates are skipped. |
 | `add_observations` | Adds facts to an entity, enforcing the length limit and the per-entity cap. |
-| `rename_entity` | Renames an entity, keeping its observations, relations and archive. Not in the reference server. |
-| `archived_observations` | Lists what was archived for an entity, optionally filtered, and can restore chosen observations. Not in the reference server. |
 | `delete_observations` | Removes observations by exact text. |
 | `delete_relations` | Removes specific relations. |
 | `delete_entities` | Removes entities and every relation touching them. |
+| `rename_entity` | Renames an entity, keeping its observations, relations and archive. *Not in the reference server.* |
+| `archived_observations` | Lists what was archived for an entity, optionally filtered, and restores chosen facts. *Not in the reference server.* |
 
 The three read tools are marked read-only, so clients that support it can run them
 without asking.
+
+## Command line
+
+| Command | What it does |
+|---|---|
+| `memory-lean` | Runs the MCP server over stdio. This is what agents start. |
+| `memory-lean --ui [port]` | Opens the web UI. `--no-open` only prints the link; `--demo` uses a throwaway copy of a made-up graph. |
+| `memory-lean --protocol` | Prints the agent instructions, ready to append to `AGENTS.md`, `CLAUDE.md` or `GEMINI.md`. |
+| `memory-lean --skill <dir>` | Writes the same instructions as an Agent Skill into `<dir>/memory-graph`. |
+| `memory-lean --lint` | Reports what in the graph is over budget. Read-only. |
+| `memory-lean --compact` | Backs up the graph, then moves overflow observations to the archive. |
+| `memory-lean --version` | Prints the version. |
+
+With npx, put `npx -y` in front: `npx -y memory-lean --ui`.
 
 ## Teach your agent to use it
 
@@ -209,9 +303,7 @@ Adjust the entity types and names in it to your own work.
 Point `MEMORY_FILE_PATH` at your existing `memory.jsonl` and swap the command. The
 file format is identical, so you can switch back at any time. Existing
 observations longer than 300 characters are kept as they are; only new writes are
-checked.
-
-To see what in an existing graph is over budget, and optionally fix it:
+checked. To see what is over budget, and optionally fix it:
 
 ```bash
 npx -y memory-lean --lint      # report only
@@ -230,34 +322,57 @@ All optional, set as environment variables on the server:
 | `MEMORY_SEARCH_LIMIT` | `10` | Default number of search results |
 | `MEMORY_BACKUPS_KEPT` | `7` | Daily backups kept |
 
-## Good to know
+## FAQ
 
-- **Your graph is private.** It holds whatever your agent learned about your
-  projects. Keep it out of git, and never store passwords, keys or tokens in it:
-  record where a secret lives, not its value.
-- **Search is plain text matching**, not embeddings. Good entity names matter more
-  than clever queries.
+<details>
+<summary><b>Is my memory sent anywhere?</b></summary>
+
+<br>No. The server reads and writes local files and makes no network requests. The
+web UI listens on <code>127.0.0.1</code> only. Keep the graph out of git, and never
+store passwords, keys or tokens in it: record where a secret lives, not its value.
+</details>
+
+<details>
+<summary><b>Can several agents or sessions share one graph?</b></summary>
+
+<br>Yes. Every write takes a lock, re-reads the file and replaces it atomically, so
+parallel sessions (and the web UI) do not overwrite each other.
+</details>
+
+<details>
+<summary><b>Why plain text search instead of embeddings?</b></summary>
+
+<br>It needs no model, no index and no dependencies, and an agent's queries are
+mostly names it already knows. Good entity names matter more than clever queries.
+</details>
+
+<details>
+<summary><b>What happens to old facts?</b></summary>
+
+<br>When an entity passes 15 facts, the oldest dated ones move to
+<code>archive/&lt;entity&gt;.md</code> next to the graph. <code>archived_observations</code>,
+or the Archive section in the web UI, lists and restores them.
+</details>
 
 ## Roadmap
 
-- [x] A Claude Code plugin that installs the server and the agent protocol together
-- [x] Ready-made setup for MiMo Code, Codex, Cursor and other agents
-- [x] Setup guides for Cline, Zed and JetBrains IDEs
-- [x] Windows in the CI matrix
-- [x] `rename_entity`, keeping relations intact
-- [x] A way to list and restore archived observations
-- [ ] Listings in the MCP registry and the Claude Code plugin directory
-- [ ] Search across archived observations of every entity
+- [x] Claude Code plugin with the server, a skill and `/memory-ui`
+- [x] Setup guides for 12 agents
+- [x] `rename_entity` and archive restore
+- [x] A web UI to explore and edit the graph
+- [x] Listed in the official MCP registry
+- [ ] Listed in the Claude Code plugin directory
+- [ ] Search across the archived facts of every entity
+- [ ] Undo in the web UI
 
 ## Contributing
 
-Ideas, bug reports and pull requests are welcome. The whole server is one file
-with no dependencies, and `npm test` runs in about a second, so a first change is
-quick to make. [CONTRIBUTING.md](CONTRIBUTING.md) has the layout, the ground rules
-and a list of good first contributions.
+Ideas, bug reports and pull requests are welcome. The server is one file with no
+dependencies, the web UI is one HTML file, and `npm test` runs in a few seconds,
+so a first change is quick to make. [CONTRIBUTING.md](CONTRIBUTING.md) has the
+layout, the ground rules and a list of good first contributions.
 
-If you try memory-lean on your own graph, the output of `tools/bench.mjs` makes a
-useful issue post. And if it saves you tokens, a ⭐ helps other people find it.
+If memory-lean saves you tokens, a ⭐ helps other people find it.
 
 ## Support
 
