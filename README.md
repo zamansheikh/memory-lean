@@ -269,7 +269,9 @@ Only in archived observations (archived_observations lists and restores them):
 Results are ranked so that a term in the entity's name counts, and one fact
 holding every term counts for more than several facts holding one each. The
 facts shown are about the terms the name does not already answer: a standing
-fact first, then the newest.
+fact first, then the newest. A term matches as any part of a word, so `deploy`
+finds `deployed`, but a whole word ranks above the start of a longer word, and
+that above the middle of one.
 
 ### Why it stays lean
 
@@ -318,7 +320,7 @@ without asking.
 | `memory-lean --ui [port]` | Opens the web UI. `--no-open` only prints the link; `--demo` uses a throwaway copy of a made-up graph. |
 | `memory-lean --protocol` | Prints the agent instructions, ready to append to `AGENTS.md`, `CLAUDE.md` or `GEMINI.md`. |
 | `memory-lean --skill <dir>` | Writes the same instructions as an Agent Skill into `<dir>/memory-graph`. |
-| `memory-lean --lint` | Reports what in the graph is over budget or needs tidying: pending work that blocks nothing or has gone quiet, near-duplicate names, entities with no relations, relations to nothing, archives of no entity. Read-only. |
+| `memory-lean --lint` | Reports what in the graph is over budget or needs tidying: pending work that blocks nothing or has gone quiet, near-duplicate names, entities with no relations or with no fact saying what they are, relations to nothing, archives of no entity. Read-only. |
 | `memory-lean --compact` | Backs up the graph, then moves overflow observations to the archive. |
 | `memory-lean --version` | Prints the version. |
 

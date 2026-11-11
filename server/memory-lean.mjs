@@ -57,6 +57,10 @@ const READ_MAX_CHARS = 8000;
 const ARCHIVE_HITS_SHOWN = 3;
 const ARCHIVE_NAMES_SHOWN = 5;
 const TOP_HITS = 3;
+// How much a search term counts by where it was found: 1 as a whole word, FIT_START at the
+// start of a longer word ("deploy" in "deployed"), FIT_INSIDE in the middle of one ("api" in
+// "capital"). WHOLE_WORD is the bonus for each term found as a whole word somewhere.
+const FIT_START = 0.8, FIT_INSIDE = 0.4, WHOLE_WORD = 30;
 const PART_MIN_CHARS = 8;
 const HERE_LEVELS = 5;
 const PENDING_STALE_DAYS = 30;
@@ -361,6 +365,11 @@ function snippet(text, terms) {
 // Rules and pending work, told by their type or by the name the protocol gives them.
 const isPending = e => /pending/i.test(e.entityType) || /^PENDING\b/.test(e.name);
 const isBinding = e => isPending(e) || /rule/i.test(e.entityType) || /^RULE\b/.test(e.name);
+// An undated fact is a standing one: what the thing is, where it lives. It is never archived,
+// and it is what a search shows of an entity matched by its name alone. Rules and pending
+// work are named for what they are, so they need none.
+const standing = e => e.observations.find(o => !DATE.test(o));
+const lacksStanding = e => !isBinding(e) && e.observations.length > 0 && standing(e) === undefined;
 
 // ---------- health ----------
 // Signs that the graph needs tidying, beyond the budget: what --lint and the web UI report.
@@ -382,6 +391,7 @@ function health(g) {
   add("names that differ only in case or separators (one thing twice?)", [...alike.values()].filter(v => v.length > 1).map(v => v.join(" ~ ")));
   add("entities stored more than once in the file", [...new Set(g.entities.map(e => e.name).filter((n, i, all) => all.indexOf(n) !== i))]);
   add("relations to an entity that does not exist", g.relations.filter(r => !names.has(r.from) || !names.has(r.to)).map(relLine));
+  add("entities with no undated fact saying what they are", g.entities.filter(lacksStanding).map(e => e.name));
   add("entities with an observation that is empty or spans several lines", g.entities.filter(e => e.observations.some(o => !o.trim() || /[\r\n]/.test(o))).map(e => e.name));
 
   const held = new Set(g.entities.map(e => fileKey(archiveFile(e.name))));
@@ -413,22 +423,31 @@ const tools = {
         relsOf.get(n).push(r);
       }
       const archived = archiveIndex(g);
-      // The observations containing a term, those with the most terms first.
+      // A term matches as any part of a text, so "deploy" finds "deployed"; how well it fits
+      // (a whole word, the start of one, the middle of one) decides the order.
+      const probes = terms.map(t => {
+        const e = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return { t, word: new RegExp(`(?<![\\p{L}\\p{N}])${e}(?![\\p{L}\\p{N}])`, "u"), start: new RegExp(`(?<![\\p{L}\\p{N}])${e}`, "u") };
+      });
+      const fit = (low, p) => !low.includes(p.t) ? 0 : p.word.test(low) ? 1 : p.start.test(low) ? FIT_START : FIT_INSIDE;
+      // The observations containing a term, those with the most terms first. 'fits' is how
+      // well each term fits, 'n' how many are there, 'w' the sum of the fits.
       const matching = observations => observations
-        .map(o => ({ o, low: o.toLowerCase() })).map(x => ({ ...x, n: terms.filter(t => x.low.includes(t)).length }))
+        .map(o => ({ o, low: o.toLowerCase() })).map(x => ({ ...x, fits: probes.map(p => fit(x.low, p)) }))
+        .map(x => ({ ...x, n: x.fits.filter(Boolean).length, w: x.fits.reduce((a, f) => a + f, 0) }))
         .filter(x => x.n).sort((a, b) => b.n - a.n);
       // The facts to show for a match. A term the name or type already holds needs no fact to
-      // prove it, so facts are ranked by the other terms: most of them first, then standing
-      // (undated) facts, then the newest. A second fact is shown when it holds a term the
-      // first lacks, and otherwise only for the top matches.
+      // prove it, so facts are ranked by the other terms: most of them first, whole words
+      // before parts of words, then standing (undated) facts, then the newest. A second fact
+      // is shown when it holds a term the first lacks, and otherwise only for the top matches.
       const pick = (found, fixed, top) => {
-        const open = terms.filter(t => !fixed.includes(t));
-        const held = x => open.filter(t => x.low.includes(t)).length;
+        const open = terms.flatMap((t, i) => fixed.includes(t) ? [] : [i]);
+        const held = x => open.filter(i => x.fits[i]).length, fitness = x => open.reduce((a, i) => a + x.fits[i], 0);
         const when = x => (x.o.match(DATE) || ["9999"])[0];
         const best = found.filter(x => !open.length || held(x))
-          .sort((a, b) => held(b) - held(a) || b.n - a.n || when(b).localeCompare(when(a)));
+          .sort((a, b) => held(b) - held(a) || fitness(b) - fitness(a) || b.n - a.n || when(b).localeCompare(when(a)));
         if (!best.length) return [];
-        const more = best.find(x => open.some(t => x.low.includes(t) && !best[0].low.includes(t))) || (top && open.length ? best[1] : undefined);
+        const more = best.find(x => open.some(i => x.fits[i] && !best[0].fits[i])) || (top && open.length ? best[1] : undefined);
         return more ? [best[0], more] : [best[0]];
       };
       const hits = [], old = [], partial = [], somewhere = new Set();
@@ -438,11 +457,14 @@ const tools = {
         const rels = (relsOf.get(e.name) || []).filter(r => terms.some(t => r.relationType.toLowerCase().includes(t)));
         const fixed = [name, type, ...rels.map(r => r.relationType.toLowerCase())].join("\n");
         const covers = found => terms.every(t => fixed.includes(t) || found.some(x => x.low.includes(t)));
-        // A term in the name counts even when the others are elsewhere, and one fact holding
-        // every term counts for more than several facts holding one each.
-        const score = found => Math.min(found.length, 5) + Math.min(rels.length, 3)
-          + 10 * Math.min(found.filter(x => x.n === terms.length).length, 3)
-          + 100 * terms.filter(t => name.includes(t)).length / terms.length
+        // A term in the name counts even when the others are elsewhere, one fact holding
+        // every term counts for more than several facts holding one each, and a term found
+        // as a whole word counts for more than the same letters inside a longer word.
+        const inName = probes.map(p => fit(name, p));
+        const score = found => Math.min(found.reduce((a, x) => a + x.w / x.n, 0), 5) + Math.min(rels.length, 3)
+          + 10 * Math.min(found.filter(x => x.n === terms.length).reduce((a, x) => a + x.w / x.n, 0), 3)
+          + 100 * inName.reduce((a, f) => a + f, 0) / terms.length
+          + WHOLE_WORD * terms.filter((t, i) => inName[i] === 1 || found.some(x => x.fits[i] === 1)).length / terms.length
           + (name === q ? 1000 : 0) + (terms.every(t => type.includes(t)) ? 20 : 0);
         const obs = matching(e.observations), gone = matching(archived.get(e.name) || []);
         if (covers(obs)) hits.push({ e, obs, rels, gone, fixed, score: score(obs) });
@@ -472,6 +494,8 @@ const tools = {
       for (const [rank, { e, obs, rels, gone, fixed }] of hits.slice(0, n).entries()) {
         let block = `- ${e.name} [${e.entityType}] ${e.observations.length} obs, ${(relsOf.get(e.name) || []).length} rel${gone.length ? `, +${gone.length} archived` : ""}\n`;
         const lines = [...pick(obs, fixed, rank < TOP_HITS).map(x => snippet(x.o, terms)), ...rels.map(relLine)];
+        // Matched by its name or type alone: one fact says what it is.
+        if (!lines.length && e.observations.length) lines.push(clip(oneLine(standing(e) ?? e.observations[0]), 160));
         for (const l of lines.slice(0, 2)) block += `    › ${l}\n`;
         if (out.length + block.length > SEARCH_MAX_CHARS) { out += `… output capped; ${hits.length - shown} more not shown.\n`; break; }
         out += block; shown++;
@@ -589,7 +613,7 @@ const tools = {
       return mutate(g => {
         const have = new Set(g.entities.map(e => e.name));
         const alike = new Map(g.entities.map(e => [fold(e.name), e.name]));
-        const made = [], skipped = [], similar = [];
+        const made = [], skipped = [], similar = [], bare = [];
         for (const e of entities) {
           if (have.has(e.name)) { skipped.push(e.name); continue; }
           if (alike.has(fold(e.name))) similar.push(`${e.name} ~ ${alike.get(fold(e.name))}`);
@@ -597,9 +621,11 @@ const tools = {
           const ent = { name: e.name, entityType: e.entityType, observations: [...new Set(e.observations || [])] };
           const moved = enforceCap(ent);
           g.entities.push(ent); have.add(e.name); made.push(e.name + (moved ? ` (${moved} archived, over cap)` : ""));
+          if (lacksStanding(ent)) bare.push(e.name);
         }
         return `Created: ${made.join(", ") || "none"}`
           + (skipped.length ? `\nAlready existed (use add_observations): ${skipped.join(", ")}` : "")
+          + (bare.length ? `\nNo undated fact says what ${bare.join(", ")} ${bare.length > 1 ? "are" : "is"}: add one${bare.length > 1 ? " each" : ""}, it is never archived.` : "")
           + (similar.length ? `\nA similar name already exists (if it is the same thing, delete the new entity and use the old): ${similar.join("; ")}` : "");
       });
     },
@@ -647,7 +673,7 @@ const tools = {
           const moved = enforceCap(e);
           out.push(`${e.name}: +${fresh.length}` + (moved ? `, ${moved} oldest archived (cap ${OBS_MAX_PER_ENTITY})` : "") + `, now ${e.observations.length}`
             + (e.observations.length > OBS_MAX_PER_ENTITY ? ` (over cap ${OBS_MAX_PER_ENTITY}: undated facts are never archived, delete stale ones)` : "")
-            + longNote(fresh));
+            + longNote(fresh) + (lacksStanding(e) ? " (no undated fact says what it is: add one)" : ""));
         }
         return out.join("\n");
       });

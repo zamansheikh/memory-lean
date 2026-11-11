@@ -61,7 +61,10 @@ file, flag or command as a claim to re-verify against the repo, not as truth.
 - A consumer updated, built and verified: delete the matching `blocks` relation;
   delete the PENDING entity when none remain.
 - A new project, service, device, key location or script: an entity with the right
-  type and `part_of` / `depends_on` / `talks_to` relations.
+  type and `part_of` / `depends_on` / `talks_to` relations. Its first fact says
+  what it is and where it lives, undated (`NestJS API behind api.example.com`):
+  undated facts are never archived, and this one is what a search shows when only
+  the name matches.
 - A rule learned from a failure: an entity of type `rule` with `applies_to`
   relations. One fact per observation; date it.
 

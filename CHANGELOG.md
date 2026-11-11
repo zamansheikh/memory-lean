@@ -27,6 +27,10 @@
   probably meant; writes still never guess.
 - The startup note names the entity that matches the folder the server was
   started in (or `CLAUDE_PROJECT_DIR`), so the agent knows what to open first.
+- An entity is asked for one undated fact saying what it is: `create_entities`
+  and `add_observations` say so when an entity has only dated facts (rules and
+  pending work excepted), and `--lint` lists such entities. A search shows that
+  fact for an entity matched by its name alone.
 - `--lint` and the web UI overview report what needs tidying: pending work that
   blocks nothing or has no dated fact in 30 days, entities with no relations,
   names that differ only in case or separators, relations to an entity that does
@@ -38,6 +42,9 @@
 - Search ranking: a term found in the entity's name counts even when the other
   terms are elsewhere, and a fact holding every term counts for more than
   several facts holding one each.
+- Search still matches any part of a word, but a term found as a whole word
+  ranks above one found at the start of a longer word, and that above one found
+  in the middle of a word.
 - Search snippets: the facts shown are about the terms the entity's name does
   not already hold, a standing (undated) fact first, then the newest. A second
   fact is shown when it adds a term, and otherwise only for the top three

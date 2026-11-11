@@ -500,6 +500,59 @@ test("search shows the facts about the topic, not the ones that only repeat the 
   assert.match(s.call("search_nodes", { query: "shop-api" }).text, /- shop-api \[service\] 5 obs, 0 rel\n    › runs behind the shop-api gateway$/);
 });
 
+test("a whole word ranks above the start of a longer word, and that above the middle of one", () => {
+  const s = session();
+  s.call("create_entities", { entities: [
+    { name: "exports", entityType: "t", observations: ["the format is CSV", "the format changed twice", "formats are listed in docs/"] },
+    { name: "team", entityType: "t", observations: ["the platform team owns it", "platform budget is fixed"] },
+    { name: "signup", entityType: "t", observations: ["the signup form posts to /api/signup"] },
+    { name: "mixed", entityType: "t", observations: ["the format is JSON", "fill in the form by hand"] },
+  ] });
+  const ranked = (query) => s.call("search_nodes", { query }).text.split("\n").filter((l) => l.startsWith("- ")).map((l) => l.split(" ")[1]);
+  // every one of them contains "form"; one fact with the word itself beats three with a longer word
+  assert.deepEqual(ranked("form"), ["mixed", "signup", "exports", "team"]);
+  // and the fact shown first is the one with the word itself
+  assert.match(s.call("search_nodes", { query: "form" }).text, /- mixed \[t\] 2 obs, 0 rel\n    › fill in the form by hand\n/);
+  // part of a word still finds it
+  assert.deepEqual(ranked("platf"), ["team"]);
+  assert.deepEqual(ranked("ormat"), ["exports", "mixed"]);
+});
+
+test("an entity matched by its name alone is shown with the fact saying what it is", () => {
+  const s = session();
+  s.call("create_entities", { entities: [
+    { name: "billing", entityType: "service", observations: ["2026-01-01: moved to Stripe", "Invoices and refunds, owns the invoices table"] },
+    { name: "billing-jobs", entityType: "worker", observations: ["2026-02-01: nightly run moved to 02:00"] },
+    { name: "billing-empty", entityType: "worker", observations: [] },
+  ] });
+  assert.equal(s.call("search_nodes", { query: "billing" }).text, [
+    '3 match "billing". open_nodes for full entities.',
+    "- billing [service] 2 obs, 0 rel",
+    "    › Invoices and refunds, owns the invoices table", // the standing fact, not the first one
+    "- billing-empty [worker] 0 obs, 0 rel",
+    "- billing-jobs [worker] 1 obs, 0 rel",
+    "    › 2026-02-01: nightly run moved to 02:00", // no standing fact: its first
+  ].join("\n"));
+});
+
+test("an entity with only dated facts is asked for one saying what it is", () => {
+  const s = session();
+  const made = s.call("create_entities", { entities: [
+    { name: "api", entityType: "service", observations: ["2026-01-01: deployed 1.0"] },
+    { name: "app", entityType: "mobile_app", observations: ["Flutter app for iOS and Android", "2026-01-01: 3.0 in the stores"] },
+    { name: "RULE no Friday deploys", entityType: "rule", observations: ["2026-01-05: a Friday deploy broke checkout"] },
+    { name: "later", entityType: "service", observations: [] },
+  ] });
+  assert.equal(made.text, "Created: api, app, RULE no Friday deploys, later\nNo undated fact says what api is: add one, it is never archived.");
+  const add = (entityName, fact) => s.call("add_observations", { observations: [{ entityName, contents: [fact] }] }).text;
+  assert.equal(add("api", "2026-01-02: deployed 1.1"), "api: +1, now 2 (no undated fact says what it is: add one)");
+  assert.equal(add("later", "2026-01-02: created"), "later: +1, now 1 (no undated fact says what it is: add one)");
+  // once it has one, and for rules and pending work, nothing is asked
+  assert.equal(add("api", "NestJS API behind api.example.com"), "api: +1, now 3");
+  assert.equal(add("RULE no Friday deploys", "2026-02-01: it happened again"), "RULE no Friday deploys: +1, now 2");
+  assert.match(s.cli("--lint"), /\n   1  entities with no undated fact saying what they are: later\n/);
+});
+
 test("replace_observation and delete_observations accept a distinctive part of a fact", () => {
   const s = session();
   s.call("create_entities", { entities: [{ name: "api", entityType: "service", observations: [
