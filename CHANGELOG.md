@@ -16,9 +16,10 @@
 - The server sends MCP `instructions` when it starts: four sentences on when to
   read the graph and what to record, for agents where the protocol was never
   installed. `MEMORY_INSTRUCTIONS=off` turns it off.
-- `open_nodes` takes `related: true`: every entity a relation leads to is
-  introduced by its first fact, with `(+N more)` when it has others. A rule is
-  often one fact, so a task starts with one call instead of two.
+- `open_nodes` takes `related: true`: the rules and pending work a relation
+  leads to come first, each introduced by its first fact, with `(+N more)` when
+  it has others. A rule is often one fact, so a task starts with one call
+  instead of two.
 - A search that matches nothing names the terms found in no entity and the
   entities that hold the most terms, instead of a bare "No entities match".
 - `open_nodes` opens a name that differs from an entity's only in case or
@@ -36,8 +37,11 @@
 
 - Search ranking: a term found in the entity's name counts even when the other
   terms are elsewhere, and a fact holding every term counts for more than
-  several facts holding one each. The snippets shown are the facts with the most
-  terms.
+  several facts holding one each.
+- Search snippets: the facts shown are about the terms the entity's name does
+  not already hold, a standing (undated) fact first, then the newest. A second
+  fact is shown when it adds a term, and otherwise only for the top three
+  matches.
 - The write tools, the rejection message and the protocol give a target length
   for a fact: half the limit, 150 characters by default, and a write that goes
   over it says so in its answer. Told only the limit, agents wrote up to it, and

@@ -13,8 +13,8 @@ facts that other projects and later sessions need.
 **At the start of any task**, before reading code: `open_nodes` with
 `related: true` on the exact names of the projects, packages and services the
 task touches (entity names are directory or package names, so you usually know
-them). It introduces every related entity by its first fact, which for most
-rules and pending items is all there is. Then `open_nodes` the ones marked
+them). It lists the related rules and pending items first, each with its first
+fact, which for most of them is all there is. Then `open_nodes` the ones marked
 `(+N more)` that bear on the task. Treat an observation that names a version,
 file, flag or command as a claim to re-verify against the repo, not as truth.
 

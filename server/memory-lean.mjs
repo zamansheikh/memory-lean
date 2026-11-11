@@ -56,6 +56,7 @@ const OPEN_MAX_CHARS = 40000;
 const READ_MAX_CHARS = 8000;
 const ARCHIVE_HITS_SHOWN = 3;
 const ARCHIVE_NAMES_SHOWN = 5;
+const TOP_HITS = 3;
 const PART_MIN_CHARS = 8;
 const HERE_LEVELS = 5;
 const PENDING_STALE_DAYS = 30;
@@ -357,13 +358,17 @@ function snippet(text, terms) {
   return (at > 0 ? "…" : "") + s + (at + 160 < text.length ? "…" : "");
 }
 
+// Rules and pending work, told by their type or by the name the protocol gives them.
+const isPending = e => /pending/i.test(e.entityType) || /^PENDING\b/.test(e.name);
+const isBinding = e => isPending(e) || /rule/i.test(e.entityType) || /^RULE\b/.test(e.name);
+
 // ---------- health ----------
 // Signs that the graph needs tidying, beyond the budget: what --lint and the web UI report.
 function health(g) {
   const names = liveNames(g), found = [];
   const add = (what, items) => { if (items.length) found.push({ what, items }); };
 
-  const pending = g.entities.filter(e => /pending/i.test(e.entityType) || /^PENDING\b/.test(e.name));
+  const pending = g.entities.filter(isPending);
   const blocking = new Set(g.relations.filter(r => r.relationType === "blocks").map(r => r.from));
   add("pending work that blocks nothing (finished? delete it)", pending.filter(e => !blocking.has(e.name)).map(e => e.name));
   const cutoff = new Date(Date.now() - PENDING_STALE_DAYS * 864e5).toISOString().slice(0, 10);
@@ -412,6 +417,20 @@ const tools = {
       const matching = observations => observations
         .map(o => ({ o, low: o.toLowerCase() })).map(x => ({ ...x, n: terms.filter(t => x.low.includes(t)).length }))
         .filter(x => x.n).sort((a, b) => b.n - a.n);
+      // The facts to show for a match. A term the name or type already holds needs no fact to
+      // prove it, so facts are ranked by the other terms: most of them first, then standing
+      // (undated) facts, then the newest. A second fact is shown when it holds a term the
+      // first lacks, and otherwise only for the top matches.
+      const pick = (found, fixed, top) => {
+        const open = terms.filter(t => !fixed.includes(t));
+        const held = x => open.filter(t => x.low.includes(t)).length;
+        const when = x => (x.o.match(DATE) || ["9999"])[0];
+        const best = found.filter(x => !open.length || held(x))
+          .sort((a, b) => held(b) - held(a) || b.n - a.n || when(b).localeCompare(when(a)));
+        if (!best.length) return [];
+        const more = best.find(x => open.some(t => x.low.includes(t) && !best[0].low.includes(t))) || (top && open.length ? best[1] : undefined);
+        return more ? [best[0], more] : [best[0]];
+      };
       const hits = [], old = [], partial = [], somewhere = new Set();
       const byScore = (a, b) => b.score - a.score || a.e.name.localeCompare(b.e.name);
       for (const e of g.entities) {
@@ -426,8 +445,8 @@ const tools = {
           + 100 * terms.filter(t => name.includes(t)).length / terms.length
           + (name === q ? 1000 : 0) + (terms.every(t => type.includes(t)) ? 20 : 0);
         const obs = matching(e.observations), gone = matching(archived.get(e.name) || []);
-        if (covers(obs)) hits.push({ e, obs, rels, gone, score: score(obs) });
-        else if (gone.length && covers([...obs, ...gone])) old.push({ e, gone, score: score(gone) });
+        if (covers(obs)) hits.push({ e, obs, rels, gone, fixed, score: score(obs) });
+        else if (gone.length && covers([...obs, ...gone])) old.push({ e, gone, fixed, score: score(gone) });
         else {
           const held = terms.filter(t => fixed.includes(t) || obs.some(x => x.low.includes(t)) || gone.some(x => x.low.includes(t)));
           for (const t of held) somewhere.add(t);
@@ -450,9 +469,9 @@ const tools = {
         ? `${hits.length} match "${query}"` + (hits.length > n ? `, top ${n} shown (narrow the query or raise limit)` : "") + ". open_nodes for full entities.\n"
         : `No current facts match "${query}".\n`;
       let shown = 0;
-      for (const { e, obs, rels, gone } of hits.slice(0, n)) {
+      for (const [rank, { e, obs, rels, gone, fixed }] of hits.slice(0, n).entries()) {
         let block = `- ${e.name} [${e.entityType}] ${e.observations.length} obs, ${(relsOf.get(e.name) || []).length} rel${gone.length ? `, +${gone.length} archived` : ""}\n`;
-        const lines = [...obs.map(x => snippet(x.o, terms)), ...rels.map(relLine)];
+        const lines = [...pick(obs, fixed, rank < TOP_HITS).map(x => snippet(x.o, terms)), ...rels.map(relLine)];
         for (const l of lines.slice(0, 2)) block += `    › ${l}\n`;
         if (out.length + block.length > SEARCH_MAX_CHARS) { out += `… output capped; ${hits.length - shown} more not shown.\n`; break; }
         out += block; shown++;
@@ -466,8 +485,8 @@ const tools = {
       } else if (old.length) {
         out += "Only in archived observations (archived_observations lists and restores them):\n";
         let listed = 0;
-        for (const { e, gone } of old.slice(0, ARCHIVE_HITS_SHOWN)) {
-          const block = `- ${e.name} [${e.entityType}] ${gone.length} archived\n    › ${snippet(gone[0].o, terms)}\n`;
+        for (const { e, gone, fixed } of old.slice(0, ARCHIVE_HITS_SHOWN)) {
+          const block = `- ${e.name} [${e.entityType}] ${gone.length} archived\n    › ${snippet((pick(gone, fixed)[0] || gone[0]).o, terms)}\n`;
           if (out.length + block.length > SEARCH_MAX_CHARS) break;
           out += block; listed++;
         }
@@ -478,7 +497,7 @@ const tools = {
   },
 
   open_nodes: {
-    description: "Return full entities by exact name, with every relation touching them. With related: true, each related entity is introduced by its first fact.",
+    description: "Return full entities by exact name, with every relation touching them. With related: true, related rules and pending work come first, each with its first fact.",
     annotations: READ_ONLY,
     inputSchema: { type: "object", properties: { names: { type: "array", items: { type: "string" } }, related: { type: "boolean" } }, required: ["names"] },
     run({ names, related }) {
@@ -491,14 +510,17 @@ const tools = {
       const found = g.entities.filter(e => want.has(e.name));
       const got = new Set(found.map(e => e.name));
       const rels = g.relations.filter(r => got.has(r.from) || got.has(r.to));
-      // With 'related', the entity at the other end of a relation is introduced by its first
-      // fact. For a rule or a pending item that is often all of it, which saves opening it.
+      // With 'related', the relations to rules and pending work come first, and each of those
+      // is introduced by its first fact: often all of it, which saves opening it. The other
+      // neighbours stay a name; their first fact rarely bears on the task and a hub has dozens.
       const byName = new Map(related ? g.entities.map(e => [e.name, e]) : []), shown = new Set(got);
+      const binds = r => [byName.get(r.from), byName.get(r.to)].some(e => e && !got.has(e.name) && isBinding(e));
+      if (related) rels.sort((a, b) => binds(b) - binds(a));
       let tail = rels.length ? "\n\n## relations" : "";
       for (const r of rels) {
         tail += "\n" + relLine(r);
         for (const e of [byName.get(r.from), byName.get(r.to)]) {
-          if (!e || shown.has(e.name)) continue;
+          if (!e || shown.has(e.name) || !isBinding(e)) continue;
           shown.add(e.name);
           if (e.observations.length) tail += `\n    › ${clip(oneLine(e.observations[0]), OBS_MAX_CHARS)}` + (e.observations.length > 1 ? ` (+${e.observations.length - 1} more)` : "");
         }

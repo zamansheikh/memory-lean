@@ -215,8 +215,8 @@ that matched:
 
 57 match "deploy", top 10 shown (narrow the query or raise limit). open_nodes for full entities.
 - shop-backend [service] 12 obs, 6 rel
-    › 2026-03-02: deployed 2.4.0 to production
     › deploy with scripts/release.sh, never by hand
+    › 2026-03-02: deployed 2.4.0 to production
 - PENDING shop-backend 2.4.0 [pending] 2 obs, 3 rel
     › …mobile apps still call the old endpoint until the deploy of 2.4.0 reaches them
 ```
@@ -231,15 +231,17 @@ The agent then opens only what it needs:
 - 2026-03-02: deployed 2.4.0 to production
 
 ## relations
-shop-app -talks_to-> shop-backend
-    › Flutter app for iOS and Android (+6 more)
 RULE no Friday deploys -applies_to-> shop-backend
     › Deploys after Thursday 18:00 need the on-call's approval
+PENDING shop-backend 2.4.0 -blocks-> shop-backend
+    › 2026-03-02: 2.4.0 published, the apps still call the old endpoint (+1 more)
+shop-app -talks_to-> shop-backend
 ```
 
-With `related: true`, every entity a relation leads to is introduced by its first
-fact. A rule is often a single fact, so one call is enough to start a task, and
-`(+6 more)` says when opening the entity would add something.
+With `related: true`, the rules and pending work that touch the entity come
+first, each introduced by its first fact. A rule is often a single fact, so one
+call is enough to start a task, and `(+1 more)` says when opening one would add
+something.
 
 A search that is too narrow does not just fail. It names the term that is nowhere
 and the entities that come closest, so the agent drops the right word instead of
@@ -265,7 +267,9 @@ Only in archived observations (archived_observations lists and restores them):
 ```
 
 Results are ranked so that a term in the entity's name counts, and one fact
-holding every term counts for more than several facts holding one each.
+holding every term counts for more than several facts holding one each. The
+facts shown are about the terms the name does not already answer: a standing
+fact first, then the newest.
 
 ### Why it stays lean
 
@@ -291,7 +295,7 @@ holding every term counts for more than several facts holding one each.
 | Tool | What it returns |
 |---|---|
 | `search_nodes` | Ranked list of entity names with counts and up to two matching snippets each. Every word must match the name, type, an observation, or the type of a relation touching the entity. Entities that match only in archived facts are named after them, with a snippet each when nothing current matches. |
-| `open_nodes` | The full entities you name, as compact text, with every relation touching them and their archive count. With `related: true`, each related entity is introduced by its first fact. A name that is right but for its case or separators still opens; other unknown names come back with "did you mean" suggestions. |
+| `open_nodes` | The full entities you name, as compact text, with every relation touching them and their archive count. With `related: true`, related rules and pending work come first, each with its first fact. A name that is right but for its case or separators still opens; other unknown names come back with "did you mean" suggestions. |
 | `read_graph` | An index: entity names grouped by type, with observation counts. Never the observations. In a large graph the biggest types are given as a count; `entityType` lists one. |
 | `create_entities` | Creates entities; existing names are skipped. |
 | `create_relations` | Creates relations between existing entities; duplicates are skipped. |

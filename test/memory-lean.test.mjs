@@ -476,6 +476,30 @@ test("search ranks a term in the name and a fact holding every term above scatte
   assert.match(s.call("search_nodes", { query: "alpha beta" }).text, /- mix \[t\] 3 obs, 0 rel\n    › alpha and beta third\n/);
 });
 
+test("search shows the facts about the topic, not the ones that only repeat the entity's name", () => {
+  const s = session();
+  const twoFacts = (name) => ({ name, entityType: "service", observations: ["release notes are in docs/", "2026-01-01: release 0.1"] });
+  s.call("create_entities", { entities: [
+    { name: "shop-api", entityType: "service", observations: [
+      "2026-01-01: shop-api moved to its own repo", "runs behind the shop-api gateway",
+      "2026-02-01: released 1.4.0", "2026-03-01: released 1.5.0", "release with scripts/release.sh, never by hand",
+    ] },
+    twoFacts("billing"), twoFacts("catalog"), twoFacts("search"),
+  ] });
+  // the name answers "shop-api"; the facts shown are about "release": the standing one, then the newest
+  assert.deepEqual(s.call("search_nodes", { query: "shop-api release" }).text.split("\n").slice(1), [
+    "- shop-api [service] 5 obs, 0 rel",
+    "    › release with scripts/release.sh, never by hand",
+    "    › 2026-03-01: released 1.5.0",
+  ]);
+  // a second fact that adds no term is kept for the top three matches only
+  const broad = s.call("search_nodes", { query: "release" }).text.split("\n");
+  assert.equal(broad.filter((l) => l.startsWith("- ")).length, 4);
+  assert.equal(broad.filter((l) => l.startsWith("    › ")).length, 3 * 2 + 1);
+  // when the name holds every term, one standing fact says what the entity is
+  assert.match(s.call("search_nodes", { query: "shop-api" }).text, /- shop-api \[service\] 5 obs, 0 rel\n    › runs behind the shop-api gateway$/);
+});
+
 test("replace_observation and delete_observations accept a distinctive part of a fact", () => {
   const s = session();
   s.call("create_entities", { entities: [{ name: "api", entityType: "service", observations: [
@@ -557,26 +581,33 @@ test("open_nodes with related introduces each related entity by its first fact",
     { name: "PENDING shop-backend 2.4.0", entityType: "pending", observations: ["2026-03-02: 2.4.0 published", "2026-03-03: web updated"] },
     { name: "empty", entityType: "t", observations: [] },
   ] });
+  s.call("create_entities", { entities: [{ name: "shop-app", entityType: "mobile_app", observations: ["Flutter app for iOS and Android", "2026-01-01: 3.0 in the stores"] }] });
   s.call("create_relations", { relations: [
+    { from: "shop-app", to: "shop-backend", relationType: "talks_to" },
     { from: "RULE no Friday deploys", to: "shop-backend", relationType: "applies_to" },
+    { from: "shop-backend", to: "empty", relationType: "depends_on" },
     { from: "PENDING shop-backend 2.4.0", to: "shop-backend", relationType: "blocks" },
     { from: "shop-backend", to: "RULE no Friday deploys", relationType: "follows" },
-    { from: "shop-backend", to: "empty", relationType: "depends_on" },
   ] });
   assert.equal(s.call("open_nodes", { names: ["shop-backend"], related: true }).text, [
     "## shop-backend [service]",
     "- NestJS API",
     "",
     "## relations",
+    // what binds the task comes first, whatever the order in the file
     "RULE no Friday deploys -applies_to-> shop-backend",
     "    › Deploys after Thursday 18:00 need the on-call's approval", // its only fact: nothing more to open
     "PENDING shop-backend 2.4.0 -blocks-> shop-backend",
     "    › 2026-03-02: 2.4.0 published (+1 more)",
     "shop-backend -follows-> RULE no Friday deploys", // introduced once
+    // other neighbours stay a name: a hub has dozens of them
+    "shop-app -talks_to-> shop-backend",
     "shop-backend -depends_on-> empty",
   ].join("\n"));
-  // without the option the answer is as small as before
-  assert.doesNotMatch(s.call("open_nodes", { names: ["shop-backend"] }).text, /›/);
+  // without the option the answer is as before, in the order of the file
+  const plain = s.call("open_nodes", { names: ["shop-backend"] }).text;
+  assert.doesNotMatch(plain, /›/);
+  assert.match(plain, /## relations\nshop-app -talks_to-> shop-backend\nRULE no Friday deploys/);
   // an entity opened in the same call is not introduced as well
   assert.doesNotMatch(s.call("open_nodes", { names: ["shop-backend", "RULE no Friday deploys"], related: true }).text, /› Deploys/);
 });
