@@ -34,7 +34,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const VERSION = "1.5.0"; // kept equal to package.json by a test
+const VERSION = "1.6.0"; // kept equal to package.json by a test
 
 const num = (name, fallback) => {
   const v = Number(process.env[name]);

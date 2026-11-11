@@ -2,7 +2,7 @@
   "mcpServers": {
     "memory": {
       "command": "npx",
-      "args": ["-y", "memory-lean@1.5.0"]
+      "args": ["-y", "memory-lean@1.6.0"]
     }
   }
 }
