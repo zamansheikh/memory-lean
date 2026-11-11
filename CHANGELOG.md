@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.1
+
+- The README has an "Install and update" section: the commands for a global npm
+  install, npx and the Claude Code plugin, and what to restart after an update.
+  No change to the server.
+
 ## 1.6.0
 
 ### Added
