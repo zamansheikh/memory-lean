@@ -19,6 +19,7 @@
 </p>
 
 <p align="center">
+  <a href="#install-and-update">Install</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#web-ui">Web UI</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -38,6 +39,36 @@ is still pending, and which rules were learned the hard way. It is a drop-in
 replacement for the reference memory server
 ([`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory)),
 with the same file and tool names, but its answers are about 40 times smaller.
+
+## Install and update
+
+memory-lean needs Node.js 18 or newer and nothing else.
+
+```bash
+npm install -g memory-lean          # install
+npm install -g memory-lean@latest   # update to the newest release
+memory-lean --version               # the version you have
+```
+
+Installed this way, the command in your agent's MCP config is `memory-lean`.
+The other two ways to run it need no npm command:
+
+| | Install | Update |
+|---|---|---|
+| **npx** | Nothing to install: the config in [Quick start](#quick-start) runs `npx -y memory-lean` | Automatic: npx fetches the newest release when the agent starts the server |
+| **Claude Code plugin** | In Claude Code:<br>`/plugin marketplace add zamansheikh/memory-lean`<br>`/plugin install memory-lean@memory-lean` | In a terminal:<br>`claude plugin marketplace update memory-lean`<br>`claude plugin update memory-lean@memory-lean` |
+
+- **Restart after an update.** A session that is already open keeps the server
+  it started with. Start a new session, or reconnect the `memory` server in your
+  agent (`/mcp` in Claude Code).
+- **Your memory is not touched.** An update replaces the server only. The graph
+  file stays as it is (`~/.claude/memory-graph/memory.jsonl` unless you moved
+  it), and every version reads the same file.
+- **npx still runs an old version?** Older npm versions reuse the copy they
+  downloaded first. Write `memory-lean@latest` in the config instead of
+  `memory-lean`.
+
+What changed in each release is in the [changelog](CHANGELOG.md).
 
 ## Highlights
 
