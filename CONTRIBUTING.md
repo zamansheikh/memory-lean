@@ -75,6 +75,17 @@ git push --follow-tags     # the tag runs .github/workflows/publish.yml
 The workflow runs the tests, publishes to npm with trusted publishing (no token),
 then updates the MCP registry. Add the release notes to `CHANGELOG.md` first.
 
+Two things are pinned on purpose:
+
+- The plugin starts `memory-lean@<its own version>` (`plugin/.mcp.json`, set by
+  `npm version`), so plugin users get the server their skill describes. For the
+  few minutes between the push and npm serving the new version, a plugin updated
+  from `main` cannot start its server; it works on the next start.
+- `mcp-registry.yml` downloads one release of `mcp-publisher` and checks its
+  SHA-256. To move to a newer one, change `MCP_PUBLISHER_VERSION` and
+  `MCP_PUBLISHER_SHA256` together (the hash is the asset's digest on the release
+  page of `modelcontextprotocol/registry`).
+
 ## Reporting a bug
 
 Open an issue with the server version (`node server/memory-lean.mjs --version`),

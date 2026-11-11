@@ -112,7 +112,8 @@ skill, a short reminder at the start of each session, and `/memory-ui`.
 /plugin install memory-lean@memory-lean
 ```
 
-**Any other agent**: add the server to its MCP config, then give it the instructions.
+**Any other agent**: add the server to its MCP config. It tells the agent the
+basics when it starts; the full instructions go into the rules file your agent reads.
 
 ```json
 {
@@ -174,7 +175,9 @@ This opens your memory in the browser. Everything an agent can do, you can do he
   Every change passes the same checks as the agents' tools.
 - **Watch.** Changes your agents make appear within two seconds.
 - **Spot problems.** The overview lists pending work, the most connected
-  entities, and anything over budget, which is also marked on the graph.
+  entities, anything over budget (also marked on the graph), and signs the graph
+  needs tidying: finished pending work, near-duplicate names, entities nothing
+  links to.
 
 <table>
 <tr>
@@ -212,8 +215,8 @@ that matched:
 
 57 match "deploy", top 10 shown (narrow the query or raise limit). open_nodes for full entities.
 - shop-backend [service] 12 obs, 6 rel
-    › 2026-03-02: deployed 2.4.0 to production
     › deploy with scripts/release.sh, never by hand
+    › 2026-03-02: deployed 2.4.0 to production
 - PENDING shop-backend 2.4.0 [pending] 2 obs, 3 rel
     › …mobile apps still call the old endpoint until the deploy of 2.4.0 reaches them
 ```
@@ -221,23 +224,62 @@ that matched:
 The agent then opens only what it needs:
 
 ```text
-> open_nodes { "names": ["shop-backend"] }
+> open_nodes { "names": ["shop-backend"], "related": true }
 
 ## shop-backend [service] (3 archived)
 - NestJS API behind api.example.com
 - 2026-03-02: deployed 2.4.0 to production
 
 ## relations
+RULE no Friday deploys -applies_to-> shop-backend
+    › Deploys after Thursday 18:00 need the on-call's approval
+PENDING shop-backend 2.4.0 -blocks-> shop-backend
+    › 2026-03-02: 2.4.0 published, the apps still call the old endpoint (+1 more)
 shop-app -talks_to-> shop-backend
-PENDING shop-backend 2.4.0 -blocks-> shop-app
 ```
+
+With `related: true`, the rules and pending work that touch the entity come
+first, each introduced by its first fact. A rule is often a single fact, so one
+call is enough to start a task, and `(+1 more)` says when opening one would add
+something.
+
+A search that is too narrow does not just fail. It names the term that is nowhere
+and the entities that come closest, so the agent drops the right word instead of
+guessing:
+
+```text
+> search_nodes { "query": "shop release pipeline" }
+
+No entities match "shop release pipeline". In no entity: pipeline. Closest (2 of 3 terms): shop-backend, shop-app.
+```
+
+Facts that were moved to the archive still answer a search. An entity whose only
+match is an archived fact is named after the current ones, and shown with a
+snippet when nothing current matches:
+
+```text
+> search_nodes { "query": "postgres" }
+
+No current facts match "postgres".
+Only in archived observations (archived_observations lists and restores them):
+- shop-backend [service] 1 archived
+    › 2025-11-20: moved from MySQL to Postgres 16
+```
+
+Results are ranked so that a term in the entity's name counts, and one fact
+holding every term counts for more than several facts holding one each. The
+facts shown are about the terms the name does not already answer: a standing
+fact first, then the newest. A term matches as any part of a word, so `deploy`
+finds `deployed`, but a whole word ranks above the start of a longer word, and
+that above the middle of one.
 
 ### Why it stays lean
 
 | Limit | What it means |
 |---|---|
-| **Small answers** | `search_nodes` returns at most 10 names with snippets, `read_graph` returns an index of names, and only `open_nodes` returns full entities. |
-| **Short facts** | An observation longer than 300 characters is rejected, with a message telling the agent to split it or put the detail in the repo. |
+| **Small answers** | `search_nodes` returns at most 10 names with snippets, `read_graph` returns an index of names (past about 2,000 tokens, the largest types as a count), and only `open_nodes` returns full entities. |
+| **Short facts** | The tools ask for facts of under 150 characters, and a write that goes over says so. One longer than 300, or spread over several lines, is rejected, with a message telling the agent to split it or put the detail in the repo. |
+| **Cheap updates** | A stale fact is replaced in one call, named by a distinctive part of its text, so the agent does not repeat 300 characters to change one version number. |
 | **A cap per entity** | An entity keeps 15 observations. Past that, the oldest dated ones move to `archive/<entity>.md`. Nothing is deleted: they can be listed and restored, and undated facts (the identity facts) always stay. |
 | **Search that narrows** | Every word must match somewhere in the entity, so adding a word narrows the result. The reference server looks for the query as one exact phrase. |
 
@@ -254,15 +296,16 @@ PENDING shop-backend 2.4.0 -blocks-> shop-app
 
 | Tool | What it returns |
 |---|---|
-| `search_nodes` | Ranked list of entity names with counts and up to two matching snippets each. Every word must match the name, type, an observation, or the type of a relation touching the entity. |
-| `open_nodes` | The full entities you name, as compact text, with every relation touching them and their archive count. Unknown names come back with "did you mean" suggestions. |
-| `read_graph` | An index: entity names grouped by type, with observation counts. Never the observations. |
+| `search_nodes` | Ranked list of entity names with counts and up to two matching snippets each. Every word must match the name, type, an observation, or the type of a relation touching the entity. Entities that match only in archived facts are named after them, with a snippet each when nothing current matches. |
+| `open_nodes` | The full entities you name, as compact text, with every relation touching them and their archive count. With `related: true`, related rules and pending work come first, each with its first fact. A name that is right but for its case or separators still opens; other unknown names come back with "did you mean" suggestions. |
+| `read_graph` | An index: entity names grouped by type, with observation counts. Never the observations. In a large graph the biggest types are given as a count; `entityType` lists one. |
 | `create_entities` | Creates entities; existing names are skipped. |
 | `create_relations` | Creates relations between existing entities; duplicates are skipped. |
 | `add_observations` | Adds facts to an entity, enforcing the length limit and the per-entity cap. |
-| `delete_observations` | Removes observations by exact text. |
+| `replace_observation` | Replaces one fact in place. The old fact is named by its exact text or by a part of it (8+ characters) that no other fact of the entity contains. *Not in the reference server.* |
+| `delete_observations` | Removes observations, named by exact text or by such a part. |
 | `delete_relations` | Removes specific relations. |
-| `delete_entities` | Removes entities and every relation touching them. |
+| `delete_entities` | Removes entities and every relation touching them. Their archived facts stay on disk, marked as deleted, and are not passed on to a later entity of the same name. |
 | `rename_entity` | Renames an entity, keeping its observations, relations and archive. *Not in the reference server.* |
 | `archived_observations` | Lists what was archived for an entity, optionally filtered, and restores chosen facts. *Not in the reference server.* |
 
@@ -277,7 +320,7 @@ without asking.
 | `memory-lean --ui [port]` | Opens the web UI. `--no-open` only prints the link; `--demo` uses a throwaway copy of a made-up graph. |
 | `memory-lean --protocol` | Prints the agent instructions, ready to append to `AGENTS.md`, `CLAUDE.md` or `GEMINI.md`. |
 | `memory-lean --skill <dir>` | Writes the same instructions as an Agent Skill into `<dir>/memory-graph`. |
-| `memory-lean --lint` | Reports what in the graph is over budget. Read-only. |
+| `memory-lean --lint` | Reports what in the graph is over budget or needs tidying: pending work that blocks nothing or has gone quiet, near-duplicate names, entities with no relations or with no fact saying what they are, relations to nothing, archives of no entity. Read-only. |
 | `memory-lean --compact` | Backs up the graph, then moves overflow observations to the archive. |
 | `memory-lean --version` | Prints the version. |
 
@@ -286,7 +329,13 @@ With npx, put `npx -y` in front: `npx -y memory-lean --ui`.
 ## Teach your agent to use it
 
 A memory server only helps if the agent reads it before working and writes to it
-when something changes. [`docs/AGENT-PROTOCOL.md`](docs/AGENT-PROTOCOL.md) is a
+when something changes. The server says so itself: when it starts, it sends the
+client four sentences on when to read the graph and what to record, which most
+agents show to the model (about 190 tokens; `MEMORY_INSTRUCTIONS=off` stops it).
+When the folder the agent works in is named like an entity in the graph, it also
+says which entity to open first. That is enough to get going.
+
+[`docs/AGENT-PROTOCOL.md`](docs/AGENT-PROTOCOL.md) is the full version, a
 ready-made set of instructions: what to look up at the start of a task, what to
 record, how to name things, and what never to store. The Claude Code plugin
 includes it. For every other agent, one command installs it:
@@ -317,10 +366,11 @@ All optional, set as environment variables on the server:
 | Variable | Default | Meaning |
 |---|---|---|
 | `MEMORY_FILE_PATH` | `~/.claude/memory-graph/memory.jsonl` | Where the graph lives |
-| `MEMORY_OBS_MAX_CHARS` | `300` | Longest observation accepted |
+| `MEMORY_OBS_MAX_CHARS` | `300` | Longest observation accepted. The tools ask agents to aim for half of it |
 | `MEMORY_OBS_MAX` | `15` | Observations per entity before the oldest dated ones are archived |
 | `MEMORY_SEARCH_LIMIT` | `10` | Default number of search results |
 | `MEMORY_BACKUPS_KEPT` | `7` | Daily backups kept |
+| `MEMORY_INSTRUCTIONS` | on | `off` stops the server sending its short usage note to the client |
 
 ## FAQ
 
@@ -350,8 +400,9 @@ mostly names it already knows. Good entity names matter more than clever queries
 <summary><b>What happens to old facts?</b></summary>
 
 <br>When an entity passes 15 facts, the oldest dated ones move to
-<code>archive/&lt;entity&gt;.md</code> next to the graph. <code>archived_observations</code>,
-or the Archive section in the web UI, lists and restores them.
+<code>archive/&lt;entity&gt;.md</code> next to the graph. <code>search_nodes</code> still finds
+them, and <code>archived_observations</code>, or the Archive section in the web UI, lists
+and restores them.
 </details>
 
 ## Roadmap
@@ -361,8 +412,9 @@ or the Archive section in the web UI, lists and restores them.
 - [x] `rename_entity` and archive restore
 - [x] A web UI to explore and edit the graph
 - [x] Listed in the official MCP registry
+- [x] Search across the archived facts of every entity
+- [x] A health report in `--lint` and the web UI
 - [ ] Listed in the Claude Code plugin directory
-- [ ] Search across the archived facts of every entity
 - [ ] Undo in the web UI
 
 ## Contributing

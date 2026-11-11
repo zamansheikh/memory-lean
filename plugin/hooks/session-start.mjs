@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// Kept short on purpose: this is added to every session. The full protocol is the memory-graph skill.
+// Kept short on purpose: this is added to every session. The server's own instructions say when
+// to read the graph and what to record; this only points at the skill holding the full protocol.
 const additionalContext = [
-  "A knowledge graph of the user's projects lives in the `memory` MCP server (memory-lean).",
-  "Before reading code for a task, call open_nodes with the exact names of the projects, packages and services it touches (search_nodes if you do not know the names).",
-  "Record state changes (version bump, publish, deploy, config change, new service, rule learned from a failure) as short dated observations when they happen.",
+  "A knowledge graph of the user's projects lives in the `memory` MCP server (memory-lean); its instructions say when to read it and what to record.",
   "Load the memory-graph skill for the full protocol before writing to the graph.",
 ].join(" ");
 console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
