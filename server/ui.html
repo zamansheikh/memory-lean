@@ -812,6 +812,7 @@ function overview() {
   const hubs = [...S.nodes].sort((a, b) => b.deg - a.deg || b.observations.length - a.observations.length).slice(0, 8).filter(n => n.deg);
   const attention = S.nodes.filter(n => n.long || n.observations.length > L.obsMax).slice(0, 12);
   const pending = S.nodes.filter(n => /pending/i.test(n.entityType) || /^PENDING\b/.test(n.name));
+  const tidy = d.health || [], TIDY_SHOWN = 6;
   return h("div", { class: "pad" },
     h("h2", { text: "Your memory" }),
     h("div", { class: "stats4" },
@@ -830,6 +831,13 @@ function overview() {
     attention.length ? h("div", { class: "sec", style: "margin:0 -18px" }, h("h3", {}, "Over budget", h("span", { class: "n", text: attention.length })),
       h("p", { class: "faint", style: "margin:-2px 0 6px;font-size:12px", text: `Facts over ${L.obsMaxChars} characters, or more than ${L.obsMax} facts. Shown with a dashed orange ring.` }),
       h("ul", { class: "plain" }, ...attention.map(n => h("li", {}, nodeLink(n, n.long ? `${n.long} long` : `${n.observations.length} facts`))))) : null,
+    tidy.length ? h("div", { class: "sec", style: "margin:0 -18px" }, h("h3", {}, "Worth a look", h("span", { class: "n", text: tidy.reduce((s, f) => s + f.items.length, 0) })),
+      h("p", { class: "faint", style: "margin:-2px 0 8px;font-size:12px", text: "Signs the graph needs tidying. Nothing here is changed for you." }),
+      ...tidy.map(f => h("div", { style: "margin:0 0 10px" },
+        h("div", { style: "font-size:12.5px", text: `${fmt(f.items.length)} · ${f.what}` }),
+        h("ul", { class: "plain" },
+          ...f.items.slice(0, TIDY_SHOWN).map(item => h("li", {}, S.byName.has(item) ? nodeLink(S.byName.get(item)) : h("span", { class: "faint", style: "font-size:12.5px;overflow-wrap:anywhere", text: item }))),
+          f.items.length > TIDY_SHOWN ? h("li", { class: "faint", style: "font-size:12px", text: `and ${fmt(f.items.length - TIDY_SHOWN)} more: memory-lean --lint lists them` }) : null)))) : null,
     h("div", { class: "sec", style: "margin:0 -18px" }, h("h3", {}, "Keys"),
       h("div", { class: "keys" },
         h("kbd", { text: "/" }), h("span", { text: "search" }), h("kbd", { text: "N" }), h("span", { text: "new entity" }),

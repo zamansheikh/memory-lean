@@ -4,8 +4,9 @@ Every setup has the same two steps:
 
 1. **Add the server**, so the agent has the memory tools.
 2. **Give the agent the protocol**, so it reads the graph before working and
-   writes to it when something changes. Without this step most agents ignore the
-   tools.
+   writes to it when something changes. The server sends a four-sentence version
+   of it when it starts, which is enough for agents that show a server's
+   instructions to the model; the full protocol makes the habit reliable.
 
 The Claude Code and MiMo Code setups below were tested on real installs. The
 others follow each tool's documented config format; if one is out of date, please

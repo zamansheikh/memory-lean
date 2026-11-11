@@ -1,5 +1,72 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+
+- `search_nodes` also searches archived facts. An entity whose only match is in
+  its archive is named after the current matches, or shown with a snippet (up
+  to three) when nothing current matches. A current match says how many more of
+  its facts match in the archive. When the current matches already overflow the
+  list, the archive costs one line.
+- `replace_observation`: replaces one fact in place. The old fact is named by its
+  exact text or by a part of it (8 or more characters) that no other fact of the
+  entity contains, so the agent does not repeat a long fact to change it.
+  `delete_observations` accepts such a part too, and reports what it matched.
+- The server sends MCP `instructions` when it starts: four sentences on when to
+  read the graph and what to record, for agents where the protocol was never
+  installed. `MEMORY_INSTRUCTIONS=off` turns it off.
+- `open_nodes` takes `related: true`: every entity a relation leads to is
+  introduced by its first fact, with `(+N more)` when it has others. A rule is
+  often one fact, so a task starts with one call instead of two.
+- A search that matches nothing names the terms found in no entity and the
+  entities that hold the most terms, instead of a bare "No entities match".
+- `open_nodes` opens a name that differs from an entity's only in case or
+  separators. "Entity not found" on a write suggests the names that were
+  probably meant; writes still never guess.
+- The startup note names the entity that matches the folder the server was
+  started in (or `CLAUDE_PROJECT_DIR`), so the agent knows what to open first.
+- `--lint` and the web UI overview report what needs tidying: pending work that
+  blocks nothing or has no dated fact in 30 days, entities with no relations,
+  names that differ only in case or separators, relations to an entity that does
+  not exist, and archive files of no current entity. `create_entities` warns
+  when a new name is a near-duplicate of an existing one.
+
+### Changed
+
+- Search ranking: a term found in the entity's name counts even when the other
+  terms are elsewhere, and a fact holding every term counts for more than
+  several facts holding one each. The snippets shown are the facts with the most
+  terms.
+- The write tools, the rejection message and the protocol give a target length
+  for a fact: half the limit, 150 characters by default, and a write that goes
+  over it says so in its answer. Told only the limit, agents wrote up to it, and
+  overshot it now and then.
+- `read_graph` has a budget (about 2,000 tokens). Past it, the types with the
+  longest lists are given as a count; `entityType` lists one.
+- The Claude Code plugin starts the server of its own version
+  (`memory-lean@x.y.z`) instead of whichever one npx resolves, and its
+  session-start reminder is two sentences now that the server sends the rest.
+- The publish workflow pins `mcp-publisher` to a release, checks its SHA-256, and
+  runs it in a separate job from the npm publish.
+
+### Fixed
+
+- Two entities whose names map to one archive file (`shop api` and `shop_api`,
+  or `API` and `api` on macOS and Windows) no longer see, or restore, each
+  other's archived facts. Sections belong to the entity named in their header.
+- Renaming an entity so that only its case changes no longer deletes its archive
+  on macOS and Windows.
+- A deleted entity's archived facts are marked as deleted on disk and are no
+  longer inherited by a later entity of the same name.
+- Names, types and facts must be on one line; names and types must not start or
+  end with a space, and a fact must not be empty. A multi-line fact was mangled
+  in the archive and could not be restored; one already in a graph is now
+  archived on one line. A name with a line break could forge a heading in
+  `open_nodes` output.
+- `initialize` answers a protocol version the server does not know with the
+  newest one it speaks, instead of echoing the request.
+
 ## 1.5.0
 
 ### Added

@@ -12,3 +12,7 @@ const edit = (file, change) => {
 edit("server/memory-lean.mjs", s => s.replace(/const VERSION = "[^"]+";/, `const VERSION = "${version}";`));
 edit("plugin/.claude-plugin/plugin.json", s => s.replace(/"version": "[^"]+"/, `"version": "${version}"`));
 edit("server.json", s => s.replace(/"version": "[^"]+"/g, `"version": "${version}"`));
+// The plugin starts the server of its own version, so a release reaches plugin users with the plugin.
+const pin = s => s.replace(/memory-lean@\d[\w.-]*/g, `memory-lean@${version}`);
+edit("plugin/.mcp.json", pin);
+edit("plugin/commands/memory-ui.md", pin);
