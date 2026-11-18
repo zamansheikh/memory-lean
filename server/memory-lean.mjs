@@ -348,11 +348,14 @@ const longNote = facts => {
 };
 
 // ---------- formatting ----------
+// Tool answers are plain text, but clients that render them as markdown (the Claude Code
+// VS Code panel, for one) turn a line starting with "#" into a heading. So no line the
+// server lays out starts with one: an entity is "name [type]", the relations "relations:".
 const relLine = r => `${r.from} -${r.relationType}-> ${r.to}`;
 
 function formatEntity(e, live) {
   const archived = archivedOf(e.name, live).length;
-  return `## ${e.name} [${e.entityType}]${archived ? ` (${archived} archived)` : ""}\n` + e.observations.map(o => `- ${o}`).join("\n");
+  return `${e.name} [${e.entityType}]${archived ? ` (${archived} archived)` : ""}\n` + e.observations.map(o => `- ${o}`).join("\n");
 }
 
 function snippet(text, terms) {
@@ -540,7 +543,7 @@ const tools = {
       const byName = new Map(related ? g.entities.map(e => [e.name, e]) : []), shown = new Set(got);
       const binds = r => [byName.get(r.from), byName.get(r.to)].some(e => e && !got.has(e.name) && isBinding(e));
       if (related) rels.sort((a, b) => binds(b) - binds(a));
-      let tail = rels.length ? "\n\n## relations" : "";
+      let tail = rels.length ? "\n\nrelations:" : "";
       for (const r of rels) {
         tail += "\n" + relLine(r);
         for (const e of [byName.get(r.from), byName.get(r.to)]) {

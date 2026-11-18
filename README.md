@@ -257,11 +257,11 @@ The agent then opens only what it needs:
 ```text
 > open_nodes { "names": ["shop-backend"], "related": true }
 
-## shop-backend [service] (3 archived)
+shop-backend [service] (3 archived)
 - NestJS API behind api.example.com
 - 2026-03-02: deployed 2.4.0 to production
 
-## relations
+relations:
 RULE no Friday deploys -applies_to-> shop-backend
     › Deploys after Thursday 18:00 need the on-call's approval
 PENDING shop-backend 2.4.0 -blocks-> shop-backend
