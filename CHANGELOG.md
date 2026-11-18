@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.2
+
+### Fixed
+
+- `open_nodes` no longer starts lines with `##`. Clients that render tool
+  answers as markdown (the Claude Code VS Code panel, for one) showed each
+  entity name and the relations line as a large heading. An entity now opens
+  with `name [type]` and the relations with `relations:`; the rest of the
+  answer is unchanged. A test checks that no answer starts a line with a
+  heading marker.
+
 ## 1.6.1
 
 - The README has an "Install and update" section: the commands for a global npm
