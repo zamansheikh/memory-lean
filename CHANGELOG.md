@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.3
+
+### Fixed
+
+- Facts and search hits are listed with `• ` instead of `- `. The Claude Code
+  VS Code panel renders a tool answer as markdown in a 60px preview with
+  `white-space: pre-wrap`; a `- ` line opened a list, and the spacing around it
+  filled the preview, so `open_nodes`, `search_nodes` and
+  `archived_observations` showed their first line above an empty box. With no
+  markdown block syntax the answer stays one paragraph and shows line by line.
+  The test now rejects any answer line that starts a heading, list, quote,
+  fence, rule or table.
+
 ## 1.6.2
 
 ### Fixed
