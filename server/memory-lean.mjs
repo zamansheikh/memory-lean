@@ -348,14 +348,18 @@ const longNote = facts => {
 };
 
 // ---------- formatting ----------
-// Tool answers are plain text, but clients that render them as markdown (the Claude Code
-// VS Code panel, for one) turn a line starting with "#" into a heading. So no line the
-// server lays out starts with one: an entity is "name [type]", the relations "relations:".
+// Tool answers are plain text, but some clients render them as markdown. The Claude Code
+// VS Code panel does, in a 60px preview with `white-space: pre-wrap`: a "#" line became a
+// large heading, and a "- " line opened a list whose block spacing filled the preview, so
+// only the first line showed above an empty box. So no line the server lays out starts
+// with markdown block syntax: an entity is "name [type]", its facts "• fact", the
+// relations "relations:". Kept as one paragraph, the answer shows line by line.
+const BULLET = "• ";
 const relLine = r => `${r.from} -${r.relationType}-> ${r.to}`;
 
 function formatEntity(e, live) {
   const archived = archivedOf(e.name, live).length;
-  return `${e.name} [${e.entityType}]${archived ? ` (${archived} archived)` : ""}\n` + e.observations.map(o => `- ${o}`).join("\n");
+  return `${e.name} [${e.entityType}]${archived ? ` (${archived} archived)` : ""}\n` + e.observations.map(o => BULLET + o).join("\n");
 }
 
 function snippet(text, terms) {
@@ -495,7 +499,7 @@ const tools = {
         : `No current facts match "${query}".\n`;
       let shown = 0;
       for (const [rank, { e, obs, rels, gone, fixed }] of hits.slice(0, n).entries()) {
-        let block = `- ${e.name} [${e.entityType}] ${e.observations.length} obs, ${(relsOf.get(e.name) || []).length} rel${gone.length ? `, +${gone.length} archived` : ""}\n`;
+        let block = `${BULLET}${e.name} [${e.entityType}] ${e.observations.length} obs, ${(relsOf.get(e.name) || []).length} rel${gone.length ? `, +${gone.length} archived` : ""}\n`;
         const lines = [...pick(obs, fixed, rank < TOP_HITS).map(x => snippet(x.o, terms)), ...rels.map(relLine)];
         // Matched by its name or type alone: one fact says what it is.
         if (!lines.length && e.observations.length) lines.push(clip(oneLine(standing(e) ?? e.observations[0]), 160));
@@ -513,7 +517,7 @@ const tools = {
         out += "Only in archived observations (archived_observations lists and restores them):\n";
         let listed = 0;
         for (const { e, gone, fixed } of old.slice(0, ARCHIVE_HITS_SHOWN)) {
-          const block = `- ${e.name} [${e.entityType}] ${gone.length} archived\n    › ${snippet((pick(gone, fixed)[0] || gone[0]).o, terms)}\n`;
+          const block = `${BULLET}${e.name} [${e.entityType}] ${gone.length} archived\n    › ${snippet((pick(gone, fixed)[0] || gone[0]).o, terms)}\n`;
           if (out.length + block.length > SEARCH_MAX_CHARS) break;
           out += block; listed++;
         }
@@ -722,7 +726,7 @@ const tools = {
         // Over budget, the oldest are left out: the newest are the likeliest to be wanted back.
         let shown = items.length, size = 0;
         while (shown > 0 && size + items[shown - 1].length + 3 <= SEARCH_MAX_CHARS) size += items[--shown].length + 3;
-        return `${items.length} archived for ${entityName}` + (shown ? `, ${shown} oldest not shown (add a query)` : "") + ":\n" + items.slice(shown).map(o => `- ${o}`).join("\n");
+        return `${items.length} archived for ${entityName}` + (shown ? `, ${shown} oldest not shown (add a query)` : "") + ":\n" + items.slice(shown).map(o => BULLET + o).join("\n");
       }
       const want = new Set(list(restore, "restore")), file = archiveFile(entityName);
       let sections;

@@ -63,7 +63,7 @@ test("create, relate, open and search", () => {
   assert.match(opened, /app -talks_to-> api/);
   // search returns names + snippets, not whole entities
   const found = s.call("search_nodes", { query: "deployed" }).text;
-  assert.match(found, /- api \[service\] 2 obs, 1 rel/);
+  assert.match(found, /• api \[service\] 2 obs, 1 rel/);
   assert.doesNotMatch(found, /NestJS backend/);
   // every term must match
   assert.match(s.call("search_nodes", { query: "deployed flutter" }).text, /No entities match/);
@@ -83,7 +83,7 @@ test("search matches relation types and caps the result list", () => {
   assert.match(blocked, /› PENDING api 2\.0 -blocks-> svc1/);
   const capped = s.call("search_nodes", { query: "deployed", limit: 2 }).text;
   assert.match(capped, /4 match "deployed", top 2 shown/);
-  assert.equal(capped.split("\n").filter((l) => l.startsWith("- ")).length, 2);
+  assert.equal(capped.split("\n").filter((l) => l.startsWith("• ")).length, 2);
 });
 
 test("read_graph is an index, not the graph", () => {
@@ -119,7 +119,7 @@ test("rejects malformed writes with a readable error and stores nothing", () => 
 test("an entity without a type in the file does not break search", () => {
   const s = session();
   fs.writeFileSync(s.file, JSON.stringify({ type: "entity", name: "x", observations: ["hello"] }) + "\n");
-  assert.match(s.call("search_nodes", { query: "hello" }).text, /- x \[unknown\] 1 obs/);
+  assert.match(s.call("search_nodes", { query: "hello" }).text, /• x \[unknown\] 1 obs/);
 });
 
 test("unreadable lines are set aside on the next write, not deleted", () => {
@@ -257,7 +257,7 @@ test("rename_entity keeps observations, relations and the archive", () => {
   s.call("create_relations", { relations: [{ from: "app", to: "old api", relationType: "talks_to" }, { from: "old api", to: "old api", relationType: "replaces" }] });
   assert.match(s.call("rename_entity", { name: "old api", newName: "api" }).text, /Renamed old api -> api; 3 relation end\(s\) updated/);
   const opened = s.call("open_nodes", { names: ["api"] }).text;
-  assert.match(opened, /^api \[service\] \(1 archived\)\n- 2026-01-02: b/m);
+  assert.match(opened, /^api \[service\] \(1 archived\)\n• 2026-01-02: b/m);
   assert.match(opened, /app -talks_to-> api\napi -replaces-> api/);
   assert.match(s.call("open_nodes", { names: ["old api"] }).text, /Not found: "old api"/);
   assert.deepEqual(fs.readdirSync(path.join(s.dir, "archive")), ["api.md"]);
@@ -274,15 +274,15 @@ test("archived observations can be listed, searched and restored", () => {
     "2026-01-01: deployed 1.0", "2026-01-02: moved to Postgres", "2026-01-03: deployed 1.1", "2026-01-04: deployed 1.2",
   ] }] });
   assert.match(s.call("open_nodes", { names: ["api"] }).text, /^api \[service\] \(2 archived\)/m);
-  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "2 archived for api:\n- 2026-01-01: deployed 1.0\n- 2026-01-02: moved to Postgres");
-  assert.equal(s.call("archived_observations", { entityName: "api", query: "postgres moved" }).text, "1 archived for api:\n- 2026-01-02: moved to Postgres");
+  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "2 archived for api:\n• 2026-01-01: deployed 1.0\n• 2026-01-02: moved to Postgres");
+  assert.equal(s.call("archived_observations", { entityName: "api", query: "postgres moved" }).text, "1 archived for api:\n• 2026-01-02: moved to Postgres");
   assert.match(s.call("archived_observations", { entityName: "api", query: "mysql" }).text, /None of the 2 archived/);
   assert.match(s.call("archived_observations", { entityName: "other" }).text, /Nothing archived for "other"/);
 
   const res = s.call("archived_observations", { entityName: "api", restore: ["2026-01-02: moved to Postgres", "typo"] });
   assert.match(res.text, /api: restored 1, now 3 \(1 not matched exactly\) \(over cap 2/);
   assert.deepEqual(s.rows()[0].observations, ["2026-01-03: deployed 1.1", "2026-01-04: deployed 1.2", "2026-01-02: moved to Postgres"]);
-  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "1 archived for api:\n- 2026-01-01: deployed 1.0");
+  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "1 archived for api:\n• 2026-01-01: deployed 1.0");
 
   // nothing matched: the graph and the archive are left alone
   const miss = s.call("archived_observations", { entityName: "api", restore: ["nope"] });
@@ -395,7 +395,7 @@ test("a multi-line observation from an older file is archived on one line and ca
   fs.writeFileSync(s.file, JSON.stringify(row) + "\n");
   s.call("add_observations", { observations: [{ entityName: "a", contents: ["2026-01-03: newest"] }] });
   const flat = "2026-01-01: first line ## not a header - not an item";
-  assert.equal(s.call("archived_observations", { entityName: "a" }).text, `2 archived for a:\n- ${flat}\n- 2026-01-02: newer`);
+  assert.equal(s.call("archived_observations", { entityName: "a" }).text, `2 archived for a:\n• ${flat}\n• 2026-01-02: newer`);
   assert.match(s.call("archived_observations", { entityName: "a", restore: [flat] }).text, /a: restored 1, now 2/);
   assert.deepEqual(s.rows()[0].observations, ["2026-01-03: newest", flat]);
 });
@@ -407,13 +407,13 @@ test("entities whose names share an archive file keep their archives apart", () 
   s.call("create_entities", { entities: names.map((name) => ({ name, entityType: "t", observations: [`2026-01-01: old fact of ${name}`, `2026-01-02: new fact of ${name}`] })) });
   for (const name of names) {
     assert.match(s.call("open_nodes", { names: [name] }).text, /\(1 archived\)/, name);
-    assert.equal(s.call("archived_observations", { entityName: name }).text, `1 archived for ${name}:\n- 2026-01-01: old fact of ${name}`);
+    assert.equal(s.call("archived_observations", { entityName: name }).text, `1 archived for ${name}:\n• 2026-01-01: old fact of ${name}`);
   }
   // one entity cannot restore the other's fact, and restoring its own leaves the other's in the file
   assert.equal(s.call("archived_observations", { entityName: "api", restore: ["2026-01-01: old fact of API"] }).isError, true);
   assert.match(s.call("archived_observations", { entityName: "shop api", restore: ["2026-01-01: old fact of shop api"] }).text, /restored 1/);
   assert.match(s.call("archived_observations", { entityName: "shop api" }).text, /Nothing archived/);
-  assert.equal(s.call("archived_observations", { entityName: "shop_api" }).text, "1 archived for shop_api:\n- 2026-01-01: old fact of shop_api");
+  assert.equal(s.call("archived_observations", { entityName: "shop_api" }).text, "1 archived for shop_api:\n• 2026-01-01: old fact of shop_api");
 });
 
 test("a deleted entity's archive is kept on disk but not inherited by a new entity of that name", () => {
@@ -422,7 +422,7 @@ test("a deleted entity's archive is kept on disk but not inherited by a new enti
   s.call("delete_entities", { entityNames: ["a", "never existed"] });
   s.call("create_entities", { entities: [{ name: "a", entityType: "other", observations: ["2026-02-01: one", "2026-02-02: two"] }] });
   assert.match(s.call("open_nodes", { names: ["a"] }).text, /^a \[other\] \(1 archived\)\n/);
-  assert.equal(s.call("archived_observations", { entityName: "a" }).text, "1 archived for a:\n- 2026-02-01: one");
+  assert.equal(s.call("archived_observations", { entityName: "a" }).text, "1 archived for a:\n• 2026-02-01: one");
   assert.match(s.call("search_nodes", { query: "old" }).text, /No entities match/);
   assert.match(fs.readFileSync(path.join(s.dir, "archive", "a.md"), "utf8"), /from `a` \(deleted [\d: -]+\)\n- 2026-01-01: old\n/);
 });
@@ -431,10 +431,10 @@ test("renaming keeps the archive when only the case changes, and reads archives 
   const s = session({ MEMORY_OBS_MAX: "1" });
   s.call("create_entities", { entities: [{ name: "API", entityType: "t", observations: ["2026-01-01: a", "2026-01-02: b"] }] });
   s.call("rename_entity", { name: "API", newName: "api" });
-  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "1 archived for api:\n- 2026-01-01: a");
+  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "1 archived for api:\n• 2026-01-01: a");
   // before 1.6 a renamed entity's sections kept the old name in their header
   fs.writeFileSync(path.join(s.dir, "archive", "api.md"), "\n## auto-archived (over cap) 2026-01-01 00:00:00 from `old name`\n- 2025-12-31: legacy\n\n## archived 2025-09-27-160341 from entity `older name`\n- 2025-09-01: older\n");
-  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "2 archived for api:\n- 2025-12-31: legacy\n- 2025-09-01: older");
+  assert.equal(s.call("archived_observations", { entityName: "api" }).text, "2 archived for api:\n• 2025-12-31: legacy\n• 2025-09-01: older");
   // the next rename puts its own name on them
   s.call("rename_entity", { name: "api", newName: "gateway" });
   assert.match(fs.readFileSync(path.join(s.dir, "archive", "gateway.md"), "utf8"), /from `gateway`\n- 2025-12-31: legacy\n\n## archived 2025-09-27-160341 from entity `gateway`\n- 2025-09-01: older\n/);
@@ -448,13 +448,13 @@ test("search finds entities that match only in archived observations", () => {
     { name: "web", entityType: "site", observations: ["2026-01-01: deployed 0.1", "2026-01-02: redesigned"] },
   ] });
   assert.equal(s.call("search_nodes", { query: "postgres" }).text,
-    'No current facts match "postgres".\nOnly in archived observations (archived_observations lists and restores them):\n- api [service] 1 archived\n    › 2026-01-01: moved to Postgres');
+    'No current facts match "postgres".\nOnly in archived observations (archived_observations lists and restores them):\n• api [service] 1 archived\n    › 2026-01-01: moved to Postgres');
   // one term in the name, the other only in the archive
-  assert.match(s.call("search_nodes", { query: "api postgres" }).text, /Only in archived observations[^]*- api \[service\] 1 archived/);
+  assert.match(s.call("search_nodes", { query: "api postgres" }).text, /Only in archived observations[^]*• api \[service\] 1 archived/);
   // current matches come first, and say when the archive holds more of the same
   const deployed = s.call("search_nodes", { query: "deployed" }).text;
   assert.match(deployed, /^2 match "deployed"\./);
-  assert.match(deployed, /- app \[mobile_app\] 1 obs, 0 rel, \+1 archived\n/);
+  assert.match(deployed, /• app \[mobile_app\] 1 obs, 0 rel, \+1 archived\n/);
   assert.match(deployed, /\nOnly in archived observations: web \(1\)\. archived_observations lists them\.$/);
   // when the list already overflows, the archive costs one line
   const capped = s.call("search_nodes", { query: "deployed", limit: 1 }).text;
@@ -470,10 +470,10 @@ test("search ranks a term in the name and a fact holding every term above scatte
     { name: "voxa_beauty", entityType: "t", observations: ["2026-01-01: release 1.2.0 published"] },
     { name: "mix", entityType: "t", observations: ["alpha first", "beta second", "alpha and beta third"] },
   ] });
-  const ranked = s.call("search_nodes", { query: "voxa release" }).text.split("\n").filter((l) => l.startsWith("- ")).map((l) => l.split(" ")[1]);
+  const ranked = s.call("search_nodes", { query: "voxa release" }).text.split("\n").filter((l) => l.startsWith("• ")).map((l) => l.split(" ")[1]);
   assert.deepEqual(ranked, ["voxa_beauty", "changelog", "notes"]);
   // the snippet shown first is the fact with the most terms
-  assert.match(s.call("search_nodes", { query: "alpha beta" }).text, /- mix \[t\] 3 obs, 0 rel\n    › alpha and beta third\n/);
+  assert.match(s.call("search_nodes", { query: "alpha beta" }).text, /• mix \[t\] 3 obs, 0 rel\n    › alpha and beta third\n/);
 });
 
 test("search shows the facts about the topic, not the ones that only repeat the entity's name", () => {
@@ -488,16 +488,16 @@ test("search shows the facts about the topic, not the ones that only repeat the 
   ] });
   // the name answers "shop-api"; the facts shown are about "release": the standing one, then the newest
   assert.deepEqual(s.call("search_nodes", { query: "shop-api release" }).text.split("\n").slice(1), [
-    "- shop-api [service] 5 obs, 0 rel",
+    "• shop-api [service] 5 obs, 0 rel",
     "    › release with scripts/release.sh, never by hand",
     "    › 2026-03-01: released 1.5.0",
   ]);
   // a second fact that adds no term is kept for the top three matches only
   const broad = s.call("search_nodes", { query: "release" }).text.split("\n");
-  assert.equal(broad.filter((l) => l.startsWith("- ")).length, 4);
+  assert.equal(broad.filter((l) => l.startsWith("• ")).length, 4);
   assert.equal(broad.filter((l) => l.startsWith("    › ")).length, 3 * 2 + 1);
   // when the name holds every term, one standing fact says what the entity is
-  assert.match(s.call("search_nodes", { query: "shop-api" }).text, /- shop-api \[service\] 5 obs, 0 rel\n    › runs behind the shop-api gateway$/);
+  assert.match(s.call("search_nodes", { query: "shop-api" }).text, /• shop-api \[service\] 5 obs, 0 rel\n    › runs behind the shop-api gateway$/);
 });
 
 test("a whole word ranks above the start of a longer word, and that above the middle of one", () => {
@@ -508,11 +508,11 @@ test("a whole word ranks above the start of a longer word, and that above the mi
     { name: "signup", entityType: "t", observations: ["the signup form posts to /api/signup"] },
     { name: "mixed", entityType: "t", observations: ["the format is JSON", "fill in the form by hand"] },
   ] });
-  const ranked = (query) => s.call("search_nodes", { query }).text.split("\n").filter((l) => l.startsWith("- ")).map((l) => l.split(" ")[1]);
+  const ranked = (query) => s.call("search_nodes", { query }).text.split("\n").filter((l) => l.startsWith("• ")).map((l) => l.split(" ")[1]);
   // every one of them contains "form"; one fact with the word itself beats three with a longer word
   assert.deepEqual(ranked("form"), ["mixed", "signup", "exports", "team"]);
   // and the fact shown first is the one with the word itself
-  assert.match(s.call("search_nodes", { query: "form" }).text, /- mixed \[t\] 2 obs, 0 rel\n    › fill in the form by hand\n/);
+  assert.match(s.call("search_nodes", { query: "form" }).text, /• mixed \[t\] 2 obs, 0 rel\n    › fill in the form by hand\n/);
   // part of a word still finds it
   assert.deepEqual(ranked("platf"), ["team"]);
   assert.deepEqual(ranked("ormat"), ["exports", "mixed"]);
@@ -527,10 +527,10 @@ test("an entity matched by its name alone is shown with the fact saying what it 
   ] });
   assert.equal(s.call("search_nodes", { query: "billing" }).text, [
     '3 match "billing". open_nodes for full entities.',
-    "- billing [service] 2 obs, 0 rel",
+    "• billing [service] 2 obs, 0 rel",
     "    › Invoices and refunds, owns the invoices table", // the standing fact, not the first one
-    "- billing-empty [worker] 0 obs, 0 rel",
-    "- billing-jobs [worker] 1 obs, 0 rel",
+    "• billing-empty [worker] 0 obs, 0 rel",
+    "• billing-jobs [worker] 1 obs, 0 rel",
     "    › 2026-02-01: nightly run moved to 02:00", // no standing fact: its first
   ].join("\n"));
 });
@@ -644,7 +644,7 @@ test("open_nodes with related introduces each related entity by its first fact",
   ] });
   assert.equal(s.call("open_nodes", { names: ["shop-backend"], related: true }).text, [
     "shop-backend [service]",
-    "- NestJS API",
+    "• NestJS API",
     "",
     "relations:",
     // what binds the task comes first, whatever the order in the file
@@ -671,7 +671,7 @@ test("a name that is right but for its case or separators opens; a wrong one get
     { name: "shop-backend", entityType: "service", observations: ["NestJS API"] },
     { name: "shop-app", entityType: "mobile_app", observations: [] },
   ] });
-  assert.equal(s.call("open_nodes", { names: ["Shop_Backend"] }).text, "shop-backend [service]\n- NestJS API");
+  assert.equal(s.call("open_nodes", { names: ["Shop_Backend"] }).text, "shop-backend [service]\n• NestJS API");
   assert.match(s.call("open_nodes", { names: ["shop"] }).text, /^Not found: "shop"; did you mean: shop-backend, shop-app$/);
   // a write never guesses: it says what the name could have been
   const res = s.call("add_observations", { observations: [{ entityName: "shop backend", contents: ["one"] }] });
@@ -719,28 +719,41 @@ test("the startup note names the entity of the directory the server was started 
   assert.equal(note({ env: { ...env, MEMORY_INSTRUCTIONS: "off" }, cwd: dir }), undefined);
 });
 
-test("no line the server lays out starts a markdown heading", () => {
-  // Clients that render tool answers as markdown (the Claude Code VS Code panel) showed
-  // "## name [type]" as a large heading. Every reader-facing answer must stay plain text.
-  const s = session();
+test("no line the server lays out starts markdown block syntax", () => {
+  // The Claude Code VS Code panel renders tool answers as markdown in a 60px preview with
+  // white-space: pre-wrap. "## name" became a large heading; "- fact" opened a list whose
+  // spacing filled the preview, leaving an empty box under the first line. Answers stay
+  // one plain paragraph: no heading, list, quote, fence, rule or table line.
+  const s = session({ MEMORY_OBS_MAX: "2" });
   s.call("create_entities", { entities: [
-    { name: "shop-backend", entityType: "service", observations: ["NestJS API", "2026-01-01: deployed 1.0"] },
+    { name: "shop-backend", entityType: "service", observations: ["NestJS API", "2026-01-01: deployed 1.0", "2026-01-02: deployed 1.1"] },
     { name: "RULE no Friday deploys", entityType: "rule", observations: ["Deploys after Thursday need approval"] },
     { name: "PENDING shop-backend 2.0", entityType: "pending", observations: ["2026-01-02: 2.0 published", "2026-01-03: web updated"] },
+    { name: "old-site", entityType: "site", observations: ["2025-01-01: postgres migration", "2025-02-01: a", "2025-03-01: b"] },
   ] });
   s.call("create_relations", { relations: [
     { from: "RULE no Friday deploys", to: "shop-backend", relationType: "applies_to" },
     { from: "PENDING shop-backend 2.0", to: "shop-backend", relationType: "blocks" },
   ] });
-  s.call("delete_observations", { deletions: [{ entityName: "shop-backend", observations: ["deployed 1.0"] }] });
-  const answers = [
-    s.call("open_nodes", { names: ["shop-backend", "RULE no Friday deploys", "nope"], related: true }).text,
-    s.call("open_nodes", { names: ["shop-backend"] }).text,
-    s.call("search_nodes", { query: "deploy" }).text,
-    s.call("read_graph").text,
-    s.call("archived_observations", { entityName: "shop-backend" }).text,
-  ];
-  for (const text of answers) {
-    for (const line of text.split("\n")) assert.doesNotMatch(line, /^ {0,3}#{1,6}(\s|$)/, `heading-like line: ${JSON.stringify(line)}`);
+  const answers = {
+    "open_nodes related": s.call("open_nodes", { names: ["shop-backend", "RULE no Friday deploys", "nope"], related: true }).text,
+    "open_nodes": s.call("open_nodes", { names: ["shop-backend"] }).text,
+    "search_nodes": s.call("search_nodes", { query: "deploy" }).text,
+    "search_nodes archive only": s.call("search_nodes", { query: "postgres" }).text,
+    "search_nodes nothing": s.call("search_nodes", { query: "zzz" }).text,
+    "read_graph": s.call("read_graph").text,
+    "archived_observations": s.call("archived_observations", { entityName: "old-site" }).text,
+  };
+  // the archive paths were really exercised
+  assert.match(answers["search_nodes archive only"], /Only in archived observations/);
+  assert.match(answers["archived_observations"], /^1 archived for old-site:/);
+  const BLOCK = /^ {0,3}(#{1,6}(\s|$)|[-+*]\s|\d{1,9}[.)]\s|>|```|~~~|\||([-*_])\s*\3\s*\3[\s\-*_]*$|=+\s*$)/;
+  for (const [tool, text] of Object.entries(answers)) {
+    const lines = text.split("\n");
+    lines.forEach((line, i) => {
+      assert.doesNotMatch(line, BLOCK, `${tool}: markdown block line ${JSON.stringify(line)}`);
+      // after a blank line, 4+ spaces would start an indented code block
+      if (i > 0 && lines[i - 1].trim() === "") assert.doesNotMatch(line, /^ {4}/, `${tool}: code-block line ${JSON.stringify(line)}`);
+    });
   }
 });

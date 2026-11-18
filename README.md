@@ -245,10 +245,10 @@ that matched:
 > search_nodes { "query": "deploy" }
 
 57 match "deploy", top 10 shown (narrow the query or raise limit). open_nodes for full entities.
-- shop-backend [service] 12 obs, 6 rel
+• shop-backend [service] 12 obs, 6 rel
     › deploy with scripts/release.sh, never by hand
     › 2026-03-02: deployed 2.4.0 to production
-- PENDING shop-backend 2.4.0 [pending] 2 obs, 3 rel
+• PENDING shop-backend 2.4.0 [pending] 2 obs, 3 rel
     › …mobile apps still call the old endpoint until the deploy of 2.4.0 reaches them
 ```
 
@@ -258,8 +258,8 @@ The agent then opens only what it needs:
 > open_nodes { "names": ["shop-backend"], "related": true }
 
 shop-backend [service] (3 archived)
-- NestJS API behind api.example.com
-- 2026-03-02: deployed 2.4.0 to production
+• NestJS API behind api.example.com
+• 2026-03-02: deployed 2.4.0 to production
 
 relations:
 RULE no Friday deploys -applies_to-> shop-backend
@@ -293,7 +293,7 @@ snippet when nothing current matches:
 
 No current facts match "postgres".
 Only in archived observations (archived_observations lists and restores them):
-- shop-backend [service] 1 archived
+• shop-backend [service] 1 archived
     › 2025-11-20: moved from MySQL to Postgres 16
 ```
 
