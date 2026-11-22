@@ -832,3 +832,39 @@ test("create_relations suggests near entity names when an endpoint is missing", 
   ] });
   assert.match(res.text, /Skipped, entity not found: shop_app -talks_to-> shop_backend \(shop_app -> did you mean: shop-app; shop_backend -> did you mean: shop-backend\); shop-app -depends_on-> nowhere$/);
 });
+
+test("--ui --demo removes its temporary directory on exit", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "memory-lean-demo-test-"));
+  const blocker = http.createServer();
+  await new Promise((resolve) => blocker.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = blocker.address();
+    const res = spawnSync("node", [SERVER, "--ui", String(port), "--demo", "--no-open"], {
+      env: { ...process.env, TEMP: tmp, TMP: tmp, TMPDIR: tmp },
+    });
+    assert.equal(res.status, 1);
+    assert.deepEqual(fs.readdirSync(tmp), []);
+  } finally {
+    blocker.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  if (process.platform !== "win32") {
+    const tmpSig = fs.mkdtempSync(path.join(os.tmpdir(), "memory-lean-demo-sig-"));
+    const child = spawn("node", [SERVER, "--ui", "0", "--demo", "--no-open"], {
+      env: { ...process.env, TEMP: tmpSig, TMP: tmpSig, TMPDIR: tmpSig },
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        let out = "";
+        child.stdout.on("data", (chunk) => { out += chunk; if (/http:\/\/127\.0\.0\.1:\d+/.test(out)) resolve(); });
+        child.on("error", reject);
+        child.on("exit", () => reject(new Error("demo server exited before listening")));
+      });
+      await new Promise((resolve) => { child.on("exit", resolve); child.kill("SIGTERM"); });
+      assert.deepEqual(fs.readdirSync(tmpSig), []);
+    } finally {
+      try { child.kill("SIGKILL"); } catch {}
+      fs.rmSync(tmpSig, { recursive: true, force: true });
+    }
+  }
+});
