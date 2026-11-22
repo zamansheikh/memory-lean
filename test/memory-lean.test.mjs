@@ -801,7 +801,9 @@ test("hereNames stops at the home directory, including with different drive case
     { name: "myhome", entityType: "dir", observations: [] },
     { name: "my-project", entityType: "service", observations: [] },
   ] });
-  const fakeHome = path.join(s.dir, "myhome"), proj = path.join(fakeHome, "sub", "my-project");
+  // The real path: on macOS the temp dir is under /var, a link to /private/var, and the
+  // server's cwd is the resolved path, so a HOME under the link would never match it.
+  const fakeHome = path.join(fs.realpathSync(s.dir), "myhome"), proj = path.join(fakeHome, "sub", "my-project");
   fs.mkdirSync(proj, { recursive: true });
   const env = { ...s.env, HOME: fakeHome, USERPROFILE: fakeHome };
   if (process.platform === "win32") {
