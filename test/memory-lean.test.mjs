@@ -757,3 +757,18 @@ test("no line the server lays out starts markdown block syntax", () => {
     });
   }
 });
+
+test("--skill expands a leading tilde to the home directory", () => {
+  const s = session();
+  const home = path.join(s.dir, "home"), cwd = path.join(s.dir, "work");
+  fs.mkdirSync(home, { recursive: true });
+  fs.mkdirSync(cwd, { recursive: true });
+  const out = spawnSync("node", [SERVER, "--skill", "~/custom-skills"], {
+    cwd,
+    env: { ...s.env, HOME: home, USERPROFILE: home },
+  });
+  assert.equal(out.status, 0);
+  const expected = path.join(home, "custom-skills", "memory-graph", "SKILL.md");
+  assert.equal(fs.existsSync(expected), true);
+  assert.equal(fs.existsSync(path.join(cwd, "~")), false);
+});
