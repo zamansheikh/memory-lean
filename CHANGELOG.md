@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `docs/SETUP.md` and `README.md` include a setup guide for Google Antigravity.
+
+### Changed
+
+- `create_relations` includes `did you mean:` suggestions when skipping a
+  relation whose endpoint closely matches an existing entity.
+- Read paths cache parsed `archive/*.md` sections keyed by exact path and file
+  metadata (`ino`, `mtimeMs`, `ctimeMs`, `size`) so repeated searches skip
+  unchanged files, while `search_nodes` skips non-matching observations before
+  regex probing.
+
+### Fixed
+
+- `--skill <dir>` expands a leading `~` to the user's home directory so commands
+  using `~/...` work in Windows shells too.
+- `writeAtomic` retries transient Windows `EPERM`/`EACCES` errors during rename
+  and removes orphaned `.tmp` files on failure.
+- `archiveFile` prefixes Windows reserved device names (`CON`, `PRN`, `AUX`,
+  `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`) with `_` while still reading existing
+  unprefixed archives on non-Windows systems.
+- `hereNames` compares paths case-insensitively on Windows when stopping at the
+  home directory.
+- `--ui --demo` forwards termination signals and removes its temporary directory
+  on exit.
+
 ## 1.6.3
 
 ### Fixed
