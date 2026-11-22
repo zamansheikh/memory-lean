@@ -868,3 +868,45 @@ test("--ui --demo removes its temporary directory on exit", async () => {
     }
   }
 });
+
+test("archive search stays fresh when another process updates or restores an archive", async () => {
+  const s = session({ MEMORY_OBS_MAX: "1" });
+  const proc = spawn("node", [SERVER], { env: s.env, stdio: ["pipe", "pipe", "pipe"] });
+  let buf = "", nextId = 1;
+  const pending = new Map();
+  proc.stdout.on("data", (chunk) => {
+    buf += chunk.toString();
+    let idx;
+    while ((idx = buf.indexOf("\n")) !== -1) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 1);
+      if (!line) continue;
+      const msg = JSON.parse(line);
+      const p = pending.get(msg.id);
+      if (p) { pending.delete(msg.id); p.resolve(msg.result.content[0].text); }
+    }
+  });
+  const callLive = (name, args) => new Promise((resolve) => {
+    const id = nextId++;
+    pending.set(id, { resolve });
+    proc.stdin.write(callMessage(name, args, id));
+  });
+  try {
+    await callLive("create_entities", { entities: [{ name: "api", entityType: "service", observations: ["2026-01-01: moved to postgres", "2026-01-02: deployed v1"] }] });
+    // Search twice so the second call exercises the warm archive cache.
+    assert.match(await callLive("search_nodes", { query: "postgres" }), /Only in archived observations[^]*moved to postgres/);
+    assert.match(await callLive("search_nodes", { query: "postgres" }), /Only in archived observations[^]*moved to postgres/);
+
+    // Another session archives a newer observation; the live server must pick it up.
+    s.call("add_observations", { observations: [{ entityName: "api", contents: ["2026-01-03: deployed v2"] }] });
+    assert.match(await callLive("search_nodes", { query: "deployed v1" }), /Only in archived observations[^]*deployed v1/);
+
+    // Another session restores the earlier observation; it must move back to current results.
+    s.call("archived_observations", { entityName: "api", restore: ["2026-01-01: moved to postgres"] });
+    const restored = await callLive("search_nodes", { query: "postgres" });
+    assert.match(restored, /^1 match "postgres"/);
+    assert.doesNotMatch(restored, /Only in archived observations/);
+  } finally {
+    await new Promise((resolve) => { proc.on("exit", resolve); proc.stdin.end(); });
+  }
+});

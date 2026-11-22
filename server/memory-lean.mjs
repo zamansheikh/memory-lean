@@ -250,17 +250,32 @@ const reHead = (header, name) => {
   return m ? `${m[1]}${oneLine(name)}\`` : `${header} from \`${oneLine(name)}\``;
 };
 
-const archivedOf = (name, live) => [...new Set(parseArchive(archiveFile(name)).filter(s => owns(s, name, live)).flatMap(s => s.items))];
+// Cache parsed archive sections by exact file path and file metadata so repeated reads
+// skip unchanged files. Write paths still call parseArchive() directly.
+const archiveCache = new Map();
+function readArchiveCached(file) {
+  let st;
+  try { st = fs.statSync(file); } catch { archiveCache.delete(file); return []; }
+  const sig = `${st.ino}:${st.mtimeMs}:${st.ctimeMs}:${st.size}`;
+  const hit = archiveCache.get(file);
+  if (hit && hit.sig === sig) return hit.sections;
+  const sections = parseArchive(file);
+  archiveCache.set(file, { sig, sections });
+  return sections;
+}
+
+const archivedOf = (name, live) => [...new Set(readArchiveCached(archiveFile(name)).filter(s => owns(s, name, live)).flatMap(s => s.items))];
 
 // Entity name -> its archived observations, for every entity that has some. Each file is read once.
 function archiveIndex(g) {
   const index = new Map(), parsed = new Map(), live = liveNames(g);
   let files;
-  try { files = new Set(fs.readdirSync(ARCHIVE).map(fileKey)); } catch { return index; }
+  try { files = new Set(fs.readdirSync(ARCHIVE).map(fileKey)); } catch { archiveCache.clear(); return index; }
+  for (const cached of archiveCache.keys()) if (!files.has(fileKey(cached))) archiveCache.delete(cached);
   for (const e of g.entities) {
     const file = archiveFile(e.name);
     if (!files.has(fileKey(file))) continue;
-    if (!parsed.has(file)) parsed.set(file, parseArchive(file));
+    if (!parsed.has(file)) parsed.set(file, readArchiveCached(file));
     const items = [...new Set(parsed.get(file).filter(s => owns(s, e.name, live)).flatMap(s => s.items))];
     if (items.length) index.set(e.name, items);
   }
@@ -420,7 +435,9 @@ function health(g) {
   const alike = new Map();
   for (const n of names) alike.set(fold(n), [...(alike.get(fold(n)) || []), n]);
   add("names that differ only in case or separators (one thing twice?)", [...alike.values()].filter(v => v.length > 1).map(v => v.join(" ~ ")));
-  add("entities stored more than once in the file", [...new Set(g.entities.map(e => e.name).filter((n, i, all) => all.indexOf(n) !== i))]);
+  const seen = new Set(), dupes = new Set();
+  for (const e of g.entities) if (seen.has(e.name)) dupes.add(e.name); else seen.add(e.name);
+  add("entities stored more than once in the file", [...dupes]);
   add("relations to an entity that does not exist", g.relations.filter(r => !names.has(r.from) || !names.has(r.to)).map(relLine));
   add("entities with no undated fact saying what they are", g.entities.filter(lacksStanding).map(e => e.name));
   add("entities with an observation that is empty or spans several lines", g.entities.filter(e => e.observations.some(o => !o.trim() || /[\r\n]/.test(o))).map(e => e.name));
@@ -428,7 +445,7 @@ function health(g) {
   const held = new Set(g.entities.map(e => fileKey(archiveFile(e.name))));
   let files = [];
   try { files = fs.readdirSync(ARCHIVE).filter(f => f.endsWith(".md")); } catch {}
-  add("archive files of no current entity", files.filter(f => !held.has(fileKey(f)) && parseArchive(path.join(ARCHIVE, f)).some(s => !s.deleted && s.items.length)));
+  add("archive files of no current entity", files.filter(f => !held.has(fileKey(f)) && readArchiveCached(path.join(ARCHIVE, f)).some(s => !s.deleted && s.items.length)));
   return found;
 }
 
@@ -463,10 +480,19 @@ const tools = {
       const fit = (low, p) => !low.includes(p.t) ? 0 : p.word.test(low) ? 1 : p.start.test(low) ? FIT_START : FIT_INSIDE;
       // The observations containing a term, those with the most terms first. 'fits' is how
       // well each term fits, 'n' how many are there, 'w' the sum of the fits.
-      const matching = observations => observations
-        .map(o => ({ o, low: o.toLowerCase() })).map(x => ({ ...x, fits: probes.map(p => fit(x.low, p)) }))
-        .map(x => ({ ...x, n: x.fits.filter(Boolean).length, w: x.fits.reduce((a, f) => a + f, 0) }))
-        .filter(x => x.n).sort((a, b) => b.n - a.n);
+      const matching = observations => {
+        const out = [];
+        for (const o of observations) {
+          const low = o.toLowerCase();
+          // Skip non-matching observations before running regex probes or building result objects.
+          if (!terms.some(t => low.includes(t))) continue;
+          const fits = probes.map(p => fit(low, p));
+          let n = 0, w = 0;
+          for (const f of fits) if (f) { n++; w += f; }
+          if (n) out.push({ o, low, fits, n, w });
+        }
+        return out.sort((a, b) => b.n - a.n);
+      };
       // The facts to show for a match. A term the name or type already holds needs no fact to
       // prove it, so facts are ranked by the other terms: most of them first, whole words
       // before parts of words, then standing (undated) facts, then the newest. A second fact
@@ -671,6 +697,8 @@ const tools = {
       if (!list(relations, "relations").every(r => str(r?.from) && str(r?.to) && label(r?.relationType))) throw new Error("Rejected, every relation needs a non-empty from, to and relationType (one line, no space at either end).");
       return mutate(g => {
         const names = new Set(g.entities.map(e => e.name));
+        const relKey = r => JSON.stringify([r.from, r.to, r.relationType]);
+        const existing = new Set(g.relations.map(relKey));
         const made = [], skipped = [], unknown = [];
         for (const r of relations) {
           const line = relLine(r);
@@ -683,7 +711,9 @@ const tools = {
             unknown.push(hints.length ? `${line} (${hints.join("; ")})` : line);
             continue;
           }
-          if (g.relations.some(x => x.from === r.from && x.to === r.to && x.relationType === r.relationType)) { skipped.push(line); continue; }
+          const key = relKey(r);
+          if (existing.has(key)) { skipped.push(line); continue; }
+          existing.add(key);
           g.relations.push({ from: r.from, to: r.to, relationType: r.relationType }); made.push(line);
         }
         let out = `Created ${made.length} relation(s).`;
