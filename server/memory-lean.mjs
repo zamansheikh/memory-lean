@@ -674,7 +674,15 @@ const tools = {
         const made = [], skipped = [], unknown = [];
         for (const r of relations) {
           const line = relLine(r);
-          if (!names.has(r.from) || !names.has(r.to)) { unknown.push(line); continue; }
+          if (!names.has(r.from) || !names.has(r.to)) {
+            // Suggest close matches for any missing endpoint, matching open_nodes and add_observations.
+            const hints = [...new Set([r.from, r.to].filter(n => !names.has(n)))].flatMap(n => {
+              const near = nearNames(g, n).all;
+              return near.length ? [`${n} -> did you mean: ${near.join(", ")}`] : [];
+            });
+            unknown.push(hints.length ? `${line} (${hints.join("; ")})` : line);
+            continue;
+          }
           if (g.relations.some(x => x.from === r.from && x.to === r.to && x.relationType === r.relationType)) { skipped.push(line); continue; }
           g.relations.push({ from: r.from, to: r.to, relationType: r.relationType }); made.push(line);
         }

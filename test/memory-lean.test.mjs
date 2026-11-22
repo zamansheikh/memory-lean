@@ -819,3 +819,16 @@ test("hereNames stops at the home directory, including with different drive case
   assert.match(instructions, /matches the entity "my-project": open it first\.$/);
   assert.doesNotMatch(instructions, /myhome/);
 });
+
+test("create_relations suggests near entity names when an endpoint is missing", () => {
+  const s = session();
+  s.call("create_entities", { entities: [
+    { name: "shop-backend", entityType: "service", observations: ["API"] },
+    { name: "shop-app", entityType: "mobile_app", observations: ["App"] },
+  ] });
+  const res = s.call("create_relations", { relations: [
+    { from: "shop_app", to: "shop_backend", relationType: "talks_to" },
+    { from: "shop-app", to: "nowhere", relationType: "depends_on" },
+  ] });
+  assert.match(res.text, /Skipped, entity not found: shop_app -talks_to-> shop_backend \(shop_app -> did you mean: shop-app; shop_backend -> did you mean: shop-backend\); shop-app -depends_on-> nowhere$/);
+});
