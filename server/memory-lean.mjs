@@ -1081,10 +1081,18 @@ else if (arg === "--skill") writeSkill(process.argv[3]);
 else if (arg === "--ui" && process.argv.includes("--demo")) {
   // A throwaway copy of the made-up example graph, so trying the UI never touches real memory.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "memory-lean-demo-"));
+  const cleanup = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} };
   fs.copyFileSync(new URL("../examples/demo-memory.jsonl", import.meta.url), path.join(dir, "memory.jsonl"));
   const args = process.argv.slice(2).filter(a => a !== "--demo");
-  spawn(process.execPath, [process.argv[1], ...args], { stdio: "inherit", env: { ...process.env, MEMORY_FILE_PATH: path.join(dir, "memory.jsonl") } })
-    .on("exit", code => { process.exitCode = code ?? 0; });
+  const child = spawn(process.execPath, [process.argv[1], ...args], { stdio: "inherit", env: { ...process.env, MEMORY_FILE_PATH: path.join(dir, "memory.jsonl") } });
+  const stop = sig => { try { child.kill(sig); } catch {} };
+  process.on("SIGINT", stop).on("SIGTERM", stop).on("exit", cleanup);
+  child.on("exit", code => {
+    // Drop signal listeners so the parent exits once the UI server stops.
+    process.off("SIGINT", stop).off("SIGTERM", stop);
+    cleanup();
+    process.exitCode = code ?? 0;
+  });
 }
 else if (arg === "--ui") {
   const rest = process.argv.slice(3), port = rest.find(a => /^\d+$/.test(a));
