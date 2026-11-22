@@ -24,7 +24,7 @@
   <a href="#web-ui">Web UI</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#tools">Tools</a> ·
-  <a href="docs/SETUP.md">Setup for 12 agents</a> ·
+  <a href="docs/SETUP.md">Setup for 13 agents</a> ·
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -178,6 +178,7 @@ npx -y memory-lean --ui --demo
 | [Cursor](docs/SETUP.md#cursor) | `.cursor/mcp.json` | `AGENTS.md` or a rule |
 | [VS Code (Copilot)](docs/SETUP.md#vs-code-github-copilot) | `.vscode/mcp.json` | `copilot-instructions.md` |
 | [Gemini CLI](docs/SETUP.md#gemini-cli) | `settings.json` | `GEMINI.md` |
+| [Google Antigravity](docs/SETUP.md#google-antigravity) | `mcp_config.json` | skill or `GEMINI.md` |
 | [Windsurf](docs/SETUP.md#windsurf) | `mcp_config.json` | a rule |
 | [Cline](docs/SETUP.md#cline) | `cline_mcp_settings.json` | `.clinerules/` |
 | [Zed](docs/SETUP.md#zed) | `settings.json` | `AGENTS.md` or `.rules` |

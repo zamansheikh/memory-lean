@@ -8,9 +8,9 @@ Every setup has the same two steps:
    of it when it starts, which is enough for agents that show a server's
    instructions to the model; the full protocol makes the habit reliable.
 
-The Claude Code and MiMo Code setups below were tested on real installs. The
-others follow each tool's documented config format; if one is out of date, please
-open an issue.
+The Claude Code, MiMo Code and Google Antigravity setups below were tested on real
+installs. The others follow each tool's documented config format; if one is out
+of date, please open an issue.
 
 | Agent | Jump to |
 |---|---|
@@ -21,6 +21,7 @@ open an issue.
 | Cursor | [mcp.json + rule](#cursor) |
 | VS Code (GitHub Copilot) | [mcp.json + instructions](#vs-code-github-copilot) |
 | Gemini CLI | [settings + GEMINI.md](#gemini-cli) |
+| Google Antigravity | [mcp_config.json + skill](#google-antigravity) |
 | Windsurf | [mcp_config.json + rule](#windsurf) |
 | Cline | [cline_mcp_settings.json + rule](#cline) |
 | Zed | [settings.json + rules file](#zed) |
@@ -218,6 +219,30 @@ npx -y memory-lean --protocol >> .github/copilot-instructions.md
 
 ```bash
 npx -y memory-lean --protocol >> GEMINI.md
+```
+
+## Google Antigravity
+
+**1. Server.** In `~/.gemini/config/mcp_config.json` (global, applies to all sessions):
+
+```json
+{
+  "mcpServers": {
+    "memory": { "command": "npx", "args": ["-y", "memory-lean"] }
+  }
+}
+```
+
+Start a new conversation or reload via **Additional Options (...) → MCP Servers**
+to connect. On Windows, if `npx` cannot be started directly, use the `cmd /c`
+form in the [Windows note](#any-other-mcp-client) below.
+
+**2. Protocol.**
+
+```bash
+npx -y memory-lean --skill ~/.gemini/config/skills   # global skill (loaded when relevant), or
+npx -y memory-lean --skill .agents/skills            # project skill, or
+npx -y memory-lean --protocol >> GEMINI.md           # always on in the project
 ```
 
 ## Windsurf
