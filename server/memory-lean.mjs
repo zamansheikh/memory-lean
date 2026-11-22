@@ -948,7 +948,9 @@ function writeSkill(dir) {
   const text = protocolText();
   if (!text) return;
   if (!dir) { process.exitCode = 2; return console.error("Usage: memory-lean --skill <skills directory>, e.g. .claude/skills or .agents/skills"); }
-  const file = path.join(dir, "memory-graph", "SKILL.md");
+  // Windows shells do not expand a leading ~ in arguments passed to node.
+  const target = dir === "~" ? os.homedir() : /^~[\\/]/.test(dir) ? path.join(os.homedir(), dir.slice(2)) : dir;
+  const file = path.join(target, "memory-graph", "SKILL.md");
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, SKILL_HEADER + text);
   console.log(`Wrote ${file}`);
