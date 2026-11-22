@@ -120,11 +120,24 @@ function backupOncePerDay() {
   for (const f of old) fs.unlinkSync(path.join(BACKUPS, f));
 }
 
-// Readers never see a half-written file.
+const sleep = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+// Readers never see a half-written file. On Windows, renameSync can hit EPERM/EACCES
+// briefly while another reader or indexer holds the target open, so retry a few times.
 function writeAtomic(file, text) {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, text);
-  fs.renameSync(tmp, file);
+  try {
+    fs.writeFileSync(tmp, text);
+    for (let i = 0; ; i++) {
+      try { fs.renameSync(tmp, file); return; } catch (e) {
+        if (process.platform === "win32" && i < 10 && ["EPERM", "EACCES"].includes(e.code)) { sleep(10); continue; }
+        throw e;
+      }
+    }
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    throw e;
+  }
 }
 
 function save(g) {
@@ -136,8 +149,6 @@ function save(g) {
   if (g.unreadable.length) fs.appendFileSync(UNREADABLE, g.unreadable.join("\n") + "\n");
   writeAtomic(FILE, lines.join("\n") + "\n");
 }
-
-const sleep = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 // One writer at a time across processes. A lock older than LOCK_STALE_MS belongs to a
 // writer that died and is taken over.
@@ -180,7 +191,19 @@ function mutate(fn, after) {
 //   ## <why> <when> from `<entity>`
 // The file name is a readable hint, not an identity: names that differ only in case or
 // punctuation share a file, so a section belongs to the entity its header names.
-const archiveFile = name => path.join(ARCHIVE, name.replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "_") + ".md");
+const RESERVED_WIN = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+// Avoid Windows reserved device names (CON, NUL, COM1, ...) so archives stay portable across OSes.
+// On non-Windows, keep reading and writing an existing unprefixed file created by an older version.
+const archiveFile = name => {
+  const safe = name.replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "_");
+  if (!RESERVED_WIN.test(safe)) return path.join(ARCHIVE, safe + ".md");
+  const prefixed = path.join(ARCHIVE, `_${safe}.md`);
+  if (process.platform !== "win32") {
+    const legacy = path.join(ARCHIVE, safe + ".md");
+    if (fs.existsSync(legacy) && !fs.existsSync(prefixed)) return legacy;
+  }
+  return prefixed;
+};
 // Equal for two names that a case-insensitive disk keeps in one file.
 const fileKey = file => path.basename(file).normalize("NFC").toLowerCase();
 const HEADER = /^(## .*? from (?:entity )?`)(.*)`( \(deleted [^()]*\))?$/;
@@ -331,9 +354,10 @@ function hereNames() {
   try {
     const g = load(), exact = liveNames(g), byFold = new Map();
     for (const e of g.entities) if (!byFold.has(fold(e.name))) byFold.set(fold(e.name), e.name);
-    const home = os.homedir(), found = [];
+    const home = path.resolve(os.homedir()), found = [];
+    const samePath = (a, b) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
     let dir = path.resolve(process.env.CLAUDE_PROJECT_DIR || process.cwd());
-    for (let i = 0; i < HERE_LEVELS && dir !== home && dir !== path.dirname(dir); i++, dir = path.dirname(dir)) {
+    for (let i = 0; i < HERE_LEVELS && !samePath(dir, home) && dir !== path.dirname(dir); i++, dir = path.dirname(dir)) {
       const base = path.basename(dir), name = exact.has(base) ? base : fold(base) && byFold.get(fold(base));
       if (name && label(name) && name.length <= 80 && !found.includes(name)) found.push(name);
     }

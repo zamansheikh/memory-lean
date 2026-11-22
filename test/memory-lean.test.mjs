@@ -772,3 +772,50 @@ test("--skill expands a leading tilde to the home directory", () => {
   assert.equal(fs.existsSync(expected), true);
   assert.equal(fs.existsSync(path.join(cwd, "~")), false);
 });
+
+test("entities named like Windows reserved devices archive and restore safely", () => {
+  const s = session({ MEMORY_OBS_MAX: "2" });
+  s.call("create_entities", { entities: [
+    { name: "COM1", entityType: "device", observations: ["serial controller", "2026-01-01: old firmware", "2026-02-01: updated firmware"] },
+    { name: "AUX", entityType: "service", observations: ["helper service", "2026-01-02: first deploy", "2026-02-02: second deploy"] },
+  ] });
+  assert.equal(fs.existsSync(path.join(s.dir, "archive", "_COM1.md")), true);
+  assert.equal(fs.existsSync(path.join(s.dir, "archive", "_AUX.md")), true);
+  assert.match(s.call("archived_observations", { entityName: "COM1" }).text, /2026-01-01: old firmware/);
+  assert.match(s.call("search_nodes", { query: "first deploy" }).text, /Only in archived observations.*\n• AUX/);
+  assert.match(s.call("archived_observations", { entityName: "AUX", restore: ["2026-01-02: first deploy"] }).text, /AUX: restored 1/);
+  if (process.platform !== "win32") {
+    const legacy = session({ MEMORY_OBS_MAX: "2" });
+    legacy.call("create_entities", { entities: [{ name: "con", entityType: "tool", observations: ["console helper"] }] });
+    fs.mkdirSync(path.join(legacy.dir, "archive"), { recursive: true });
+    fs.writeFileSync(path.join(legacy.dir, "archive", "con.md"), "\n## auto-archived (over cap) 2026-01-01 00:00:00 from `con`\n- 2025-12-01: legacy entry\n");
+    assert.match(legacy.call("archived_observations", { entityName: "con" }).text, /2025-12-01: legacy entry/);
+    assert.match(legacy.call("search_nodes", { query: "legacy entry" }).text, /Only in archived observations[^]*• con/);
+    assert.doesNotMatch(legacy.cli("--lint"), /archive files of no current entity/);
+  }
+});
+
+test("hereNames stops at the home directory, including with different drive case on Windows", () => {
+  const s = session();
+  s.call("create_entities", { entities: [
+    { name: "myhome", entityType: "dir", observations: [] },
+    { name: "my-project", entityType: "service", observations: [] },
+  ] });
+  const fakeHome = path.join(s.dir, "myhome"), proj = path.join(fakeHome, "sub", "my-project");
+  fs.mkdirSync(proj, { recursive: true });
+  const env = { ...s.env, HOME: fakeHome, USERPROFILE: fakeHome };
+  if (process.platform === "win32") {
+    env.USERPROFILE = fakeHome.replace(/^([a-z]):/i, (_, d) => `${d.toUpperCase()}:`);
+    env.CLAUDE_PROJECT_DIR = proj.replace(/^([a-z]):/i, (_, d) => `${d.toLowerCase()}:`);
+  } else {
+    delete env.CLAUDE_PROJECT_DIR;
+  }
+  const out = spawnSync("node", [SERVER], {
+    cwd: proj,
+    env,
+    input: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }) + "\n",
+  });
+  const instructions = JSON.parse(out.stdout.toString()).result.instructions;
+  assert.match(instructions, /matches the entity "my-project": open it first\.$/);
+  assert.doesNotMatch(instructions, /myhome/);
+});
